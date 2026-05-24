@@ -1,0 +1,109 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { AwsysClient } from "../src/index.js";
+
+const client = new AwsysClient({
+  apiKey: process.env.AWSYS_API_KEY!,
+  baseUrl: process.env.AWSYS_BASE_URL ?? "https://staging.awsys.co",
+});
+
+describe("Folders", () => {
+  let createdFolderId: string;
+  let linkShortCode: string;
+
+  beforeAll(async () => {
+    // Create a link to use in folder assignment tests
+    const result = await client.links.create({
+      url: `https://example.com/sdk-folder-test-${Date.now()}`,
+    });
+    linkShortCode = result.shortCode;
+  });
+
+  afterAll(async () => {
+    // Clean up: try to delete the test folder if it was created
+    if (createdFolderId) {
+      try {
+        await client.folders.delete(createdFolderId);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  });
+
+  describe("create", () => {
+    it("creates a folder and returns id and name", async () => {
+      const folderName = `sdk-test-folder-${Date.now()}`;
+      const folder = await client.folders.create({ name: folderName });
+
+      expect(folder.id).toBeTruthy();
+      expect(folder.name).toBe(folderName);
+
+      createdFolderId = folder.id;
+    });
+
+    it("creates a folder with a color", async () => {
+      const folderName = `sdk-test-colored-${Date.now()}`;
+      const folder = await client.folders.create({
+        name: folderName,
+        color: "3b82f6",
+      });
+
+      expect(folder.id).toBeTruthy();
+      expect(folder.name).toBe(folderName);
+
+      // Clean up extra folder
+      await client.folders.delete(folder.id);
+    });
+
+    it("returns error when name is missing", async () => {
+      await expect(
+        client.folders.create({ name: "" }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("list", () => {
+    it("returns an array of folders", async () => {
+      const folders = await client.folders.list();
+
+      expect(Array.isArray(folders)).toBe(true);
+    });
+
+    it("contains the folder we created", async () => {
+      const folders = await client.folders.list();
+      const found = folders.find((f) => f.id === createdFolderId);
+      expect(found).toBeTruthy();
+    });
+  });
+
+  describe("assignLink and removeLink", () => {
+    it("assigns a link to a folder", async () => {
+      // Should not throw
+      await expect(
+        client.folders.assignLink(linkShortCode, createdFolderId),
+      ).resolves.not.toThrow();
+    });
+
+    it("removes a link from a folder", async () => {
+      // Should not throw
+      await expect(
+        client.folders.removeLink(linkShortCode),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe("delete", () => {
+    it("deletes a folder successfully", async () => {
+      // Create a disposable folder
+      const folder = await client.folders.create({
+        name: `sdk-disposable-${Date.now()}`,
+      });
+      await expect(client.folders.delete(folder.id)).resolves.not.toThrow();
+    });
+
+    it("returns error when folder not found", async () => {
+      await expect(
+        client.folders.delete("definitely-does-not-exist-xyz"),
+      ).rejects.toThrow();
+    });
+  });
+});
