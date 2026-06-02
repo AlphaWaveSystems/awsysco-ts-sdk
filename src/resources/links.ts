@@ -1,12 +1,12 @@
 import type { HttpClient } from "../http.js";
 import type {
+  CreateLinkOptions,
   CreatedLink,
   Link,
   ListLinksOptions,
   PaginatedResponse,
   UpdateLinkOptions,
 } from "../types.js";
-import type { CreateLinkOptions } from "../types.js";
 
 interface RawListResponse {
   links?: Link[];
@@ -58,10 +58,10 @@ export class LinksResource {
   }
 
   /**
-   * Update a link's expiry or click limit.
+   * Update a link's settings.
    *
    * @param shortPath - The short code or full path of the link to update
-   * @param opts - Fields to update
+   * @param opts - Fields to update (url, expiry, click limit, routing rules, OG meta, etc.)
    */
   async update(shortPath: string, opts: UpdateLinkOptions): Promise<Link> {
     return this.http.patch<Link>(

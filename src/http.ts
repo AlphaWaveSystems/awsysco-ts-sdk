@@ -164,6 +164,28 @@ export class HttpClient {
   delete<T>(path: string): Promise<T> {
     return this.request<T>("DELETE", path);
   }
+
+  async getText(path: string, params?: Record<string, string | number>): Promise<string> {
+    const url = this.buildUrl(path, params);
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.apiKey}`,
+      Accept: "text/csv",
+    };
+
+    const response = await fetch(url, { method: "GET", headers });
+
+    if (!response.ok) {
+      const body = await parseErrorBody(response);
+      const retryAfterHeader = response.headers.get("Retry-After");
+      throwForStatus(response.status, body, body, retryAfterHeader);
+    }
+
+    return response.text();
+  }
+
+  put<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>("PUT", path, { body });
+  }
 }
 
 function sleep(ms: number): Promise<void> {

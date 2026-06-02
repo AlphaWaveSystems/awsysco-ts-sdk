@@ -32,6 +32,22 @@ export interface PaginationParams {
 
 // ─── Links ───────────────────────────────────────────────────────────────────
 
+export interface RoutingRule {
+  country: string;
+  redirectUrl: string;
+}
+
+export interface OgMeta {
+  title?: string;
+  description?: string;
+  image?: string;
+}
+
+export interface GeoRestriction {
+  allowedCountries?: string[];
+  blockedCountries?: string[];
+}
+
 export interface CreateLinkOptions {
   /** The destination URL to shorten */
   url: string;
@@ -41,13 +57,43 @@ export interface CreateLinkOptions {
   expiresAt?: string;
   /** Maximum number of clicks before the link expires */
   maxClicks?: number;
+  /** Country-based routing rules */
+  routingRules?: RoutingRule[];
+  /** Open Graph metadata overrides */
+  ogMeta?: OgMeta;
+  /** Geographic access restrictions */
+  geoRestriction?: GeoRestriction;
+  /** Password-protect the link */
+  password?: string;
+  /** Pass ad click IDs (gclid, fbclid, etc.) through to the destination */
+  passAdClickIds?: boolean;
+  /** Folder ID to assign the link to */
+  folderId?: string;
+  /** Tags to attach to the link */
+  tags?: string[];
 }
 
 export interface UpdateLinkOptions {
+  /** Change the destination URL */
+  url?: string;
   /** ISO 8601 expiry date-time string */
   expiresAt?: string;
   /** Maximum number of clicks before the link expires */
   maxClicks?: number;
+  /** Country-based routing rules */
+  routingRules?: RoutingRule[];
+  /** Open Graph metadata overrides */
+  ogMeta?: OgMeta;
+  /** Geographic access restrictions */
+  geoRestriction?: GeoRestriction;
+  /** Password-protect the link */
+  password?: string;
+  /** Pass ad click IDs through to the destination */
+  passAdClickIds?: boolean;
+  /** Folder ID to assign the link to */
+  folderId?: string;
+  /** Tags to attach to the link */
+  tags?: string[];
 }
 
 /**
@@ -102,6 +148,8 @@ export interface Link {
   isCustom: boolean;
   /** Folder ID if assigned */
   folderId?: string | null;
+  /** Tags */
+  tags?: string[];
 }
 
 export interface ListLinksOptions extends PaginationParams {}
@@ -115,11 +163,19 @@ export interface ClickEvent {
   userAgent: string | null;
 }
 
+export interface AggregateStats {
+  countries: Record<string, number>;
+  devices: Record<string, number>;
+  browsers: Record<string, number>;
+  referrers: Record<string, number>;
+}
+
 export interface LinkStats {
   shortCode: string;
   fullPath: string | null;
   totalClicks: number;
   clicks: ClickEvent[];
+  aggregateStats?: AggregateStats;
 }
 
 // ─── QR Codes ────────────────────────────────────────────────────────────────
@@ -133,11 +189,25 @@ export interface QRCodeOptions {
   bgColor?: string;
 }
 
+export interface QRSettings {
+  size?: number;
+  color?: string;
+  bgColor?: string;
+  errorCorrection?: 'L' | 'M' | 'Q' | 'H';
+  margin?: number;
+  logoUrl?: string;
+}
+
 // ─── Folders ─────────────────────────────────────────────────────────────────
 
 export interface CreateFolderOptions {
   name: string;
   /** Hex color string (without #), e.g. "ff5733" */
+  color?: string;
+}
+
+export interface UpdateFolderOptions {
+  name?: string;
   color?: string;
 }
 
@@ -199,4 +269,197 @@ export interface Me {
   isPremium?: boolean;
   features?: MeFeatures;
   limits?: MeLimits;
+}
+
+// ─── Tags ────────────────────────────────────────────────────────────────────
+
+export interface TagsResult {
+  success: boolean;
+  tags: string[];
+}
+
+// ─── Trust Score ─────────────────────────────────────────────────────────────
+
+export interface TrustScoreResult {
+  short: string;
+  long: string;
+  score: number | null;
+  status: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  threats?: string[];
+  scannedAt?: string | null;
+}
+
+// ─── Namespace ───────────────────────────────────────────────────────────────
+
+export interface NamespaceInfo {
+  hasAccess: boolean;
+  namespace: string | null;
+  tier: string;
+  upgradeRequired?: boolean;
+}
+
+export interface NamespaceCheckResult {
+  namespace: string;
+  available: boolean;
+  reason: string | null;
+  previewUrl: string | null;
+}
+
+// ─── UTM Templates ───────────────────────────────────────────────────────────
+
+export interface UtmTemplate {
+  id: string;
+  name: string;
+  source: string;
+  medium: string;
+  campaign: string;
+  term?: string;
+  content?: string;
+}
+
+export interface CreateUtmTemplateOptions {
+  name: string;
+  source: string;
+  medium: string;
+  campaign: string;
+  term?: string;
+  content?: string;
+}
+
+// ─── Webhooks ────────────────────────────────────────────────────────────────
+
+export interface Webhook {
+  id: string;
+  url: string;
+  events: string[];
+  name?: string;
+  enabled: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  lastTriggered: string | null;
+  failureCount?: number;
+}
+
+export interface WebhookEventType {
+  name: string;
+  description: string;
+}
+
+export interface CreateWebhookOptions {
+  url: string;
+  events: string[];
+  name?: string;
+  secret?: string;
+}
+
+export interface UpdateWebhookOptions {
+  url?: string;
+  events?: string[];
+  name?: string;
+  secret?: string;
+  enabled?: boolean;
+}
+
+// ─── Saved Views ─────────────────────────────────────────────────────────────
+
+export interface SavedViewFilters {
+  folderId?: string;
+  tag?: string;
+  status?: string;
+  search?: string;
+  dateRange?: string;
+}
+
+export interface SavedView {
+  id: string;
+  name: string;
+  filters: SavedViewFilters;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateSavedViewOptions {
+  name: string;
+  filters: SavedViewFilters;
+}
+
+export interface UpdateSavedViewOptions {
+  name?: string;
+  filters?: SavedViewFilters;
+}
+
+// ─── Custom Domains ──────────────────────────────────────────────────────────
+
+export interface CustomDomain {
+  domain: string;
+  status: 'pending_txt' | 'verified' | 'active' | 'inactive';
+  verificationToken?: string;
+  txtRecord?: { name: string; type: string; value: string };
+  cnameRecord?: { name: string; type: string; value: string };
+  isDefault?: boolean;
+  linkCount?: number;
+  createdAt?: string;
+}
+
+export interface AddDomainResult {
+  domain: string;
+  status: string;
+  verificationToken: string;
+  txtRecord: { name: string; type: string; value: string };
+  cnameRecord: { name: string; type: string; value: string };
+}
+
+// ─── Agentlink ───────────────────────────────────────────────────────────────
+
+export interface AgentClickEntry {
+  agent: string;
+  count: number;
+}
+
+export interface AgentLinkStats {
+  short?: string;
+  totalAgentClicks: number;
+  agentClicks: AgentClickEntry[];
+  periodDays: number;
+}
+
+// ─── Affiliate ───────────────────────────────────────────────────────────────
+
+export interface AffiliateProgram {
+  id: string;
+  name: string;
+  description?: string;
+  commissionType: 'cpc' | 'cpa_return' | 'both';
+  cpcRate?: number;
+  cpaRate?: number;
+  cookieDays?: number;
+  status: string;
+  createdAt?: string;
+}
+
+export interface CreateAffiliateProgramOptions {
+  name: string;
+  description?: string;
+  commissionType: 'cpc' | 'cpa_return' | 'both';
+  cpcRate?: number;
+  cpaRate?: number;
+  cookieDays?: number;
+}
+
+export interface AffiliatePartner {
+  id: string;
+  partnerId: string;
+  email?: string;
+  status: string;
+  partnerCode?: string;
+  joinedAt?: string;
+}
+
+export interface AffiliatePartnership {
+  id: string;
+  programId: string;
+  programName?: string;
+  partnerCode?: string;
+  status: string;
+  joinedAt?: string;
 }

@@ -1,5 +1,5 @@
 import type { HttpClient } from "../http.js";
-import type { CreateFolderOptions, Folder } from "../types.js";
+import type { CreateFolderOptions, Folder, UpdateFolderOptions } from "../types.js";
 
 interface RawFoldersResponse {
   folders?: Folder[];
@@ -22,6 +22,19 @@ export class FoldersResource {
    */
   async create(opts: CreateFolderOptions): Promise<Folder> {
     return this.http.post<Folder>("/api/v1/folders", opts);
+  }
+
+  /**
+   * Update a folder's name or color.
+   *
+   * @param folderId - The ID of the folder to update
+   * @param opts - Fields to update
+   */
+  async update(folderId: string, opts: UpdateFolderOptions): Promise<Folder> {
+    return this.http.patch<Folder>(
+      `/api/v1/folders/${encodeURIComponent(folderId)}`,
+      opts,
+    );
   }
 
   /**

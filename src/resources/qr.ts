@@ -1,10 +1,13 @@
-import type { QRCodeOptions } from "../types.js";
+import type { HttpClient } from "../http.js";
+import type { QRCodeOptions, QRSettings } from "../types.js";
 
 export class QRResource {
   private readonly baseUrl: string;
+  private readonly http: HttpClient;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, http: HttpClient) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.http = http;
   }
 
   /**
@@ -32,5 +35,29 @@ export class QRResource {
     }
 
     return url.toString();
+  }
+
+  /**
+   * Get the QR code settings for a link.
+   *
+   * @param shortPath - The short code or namespaced path
+   */
+  async getSettings(shortPath: string): Promise<QRSettings> {
+    return this.http.get<QRSettings>(
+      `/api/link/${encodeURIComponent(shortPath)}/qr-settings`,
+    );
+  }
+
+  /**
+   * Update the QR code settings for a link.
+   *
+   * @param shortPath - The short code or namespaced path
+   * @param settings - The QR settings to apply
+   */
+  async updateSettings(shortPath: string, settings: QRSettings): Promise<QRSettings> {
+    return this.http.put<QRSettings>(
+      `/api/link/${encodeURIComponent(shortPath)}/qr-settings`,
+      settings,
+    );
   }
 }

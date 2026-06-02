@@ -12,25 +12,71 @@ export {
   AwsysValidationError,
 } from "./errors.js";
 
+// Resource classes
+export { AffiliateResource } from "./resources/affiliate.js";
+export { AgentlinkResource } from "./resources/agentlink.js";
+export { AnalyticsResource } from "./resources/analytics.js";
+export { BulkResource } from "./resources/bulk.js";
+export { CustomDomainsResource } from "./resources/customDomains.js";
+export { DataExportResource } from "./resources/dataExport.js";
+export { FoldersResource } from "./resources/folders.js";
+export { LinksResource } from "./resources/links.js";
+export { MeResource } from "./resources/me.js";
+export { NamespaceResource } from "./resources/namespace.js";
+export { QRResource } from "./resources/qr.js";
+export { SavedViewsResource } from "./resources/savedViews.js";
+export { TagsResource } from "./resources/tags.js";
+export { TrustScoreResource } from "./resources/trustScore.js";
+export { UtmTemplatesResource } from "./resources/utmTemplates.js";
+export { WebhooksResource } from "./resources/webhooks.js";
+
 // Types
 export type {
+  AddDomainResult,
+  AffiliatePartner,
+  AffiliatePartnership,
+  AffiliateProgram,
+  AgentClickEntry,
+  AgentLinkStats,
+  AggregateStats,
   AwsysClientConfig,
   BulkCreateOptions,
   BulkCreateResult,
   BulkLinkResult,
   ClickEvent,
+  CreateAffiliateProgramOptions,
   CreateFolderOptions,
   CreateLinkOptions,
+  CreateSavedViewOptions,
+  CreateUtmTemplateOptions,
+  CreateWebhookOptions,
   CreatedLink,
+  CustomDomain,
   Folder,
+  GeoRestriction,
   Link,
   LinkStats,
   ListLinksOptions,
   Me,
   MeFeatures,
   MeLimits,
+  NamespaceCheckResult,
+  NamespaceInfo,
+  OgMeta,
   PaginatedResponse,
   PaginationParams,
   QRCodeOptions,
+  QRSettings,
+  RoutingRule,
+  SavedView,
+  SavedViewFilters,
+  TagsResult,
+  TrustScoreResult,
+  UpdateFolderOptions,
   UpdateLinkOptions,
+  UpdateSavedViewOptions,
+  UpdateWebhookOptions,
+  UtmTemplate,
+  Webhook,
+  WebhookEventType,
 } from "./types.js";
