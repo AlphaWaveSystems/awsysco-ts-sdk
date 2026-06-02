@@ -57,6 +57,8 @@ export interface CreateLinkOptions {
   expiresAt?: string;
   /** Maximum number of clicks before the link expires */
   maxClicks?: number;
+  /** URL to redirect to when the link expires (by date or click cap), instead of showing an error page */
+  expireFallbackUrl?: string;
   /** Country-based routing rules */
   routingRules?: RoutingRule[];
   /** Open Graph metadata overrides */
@@ -80,6 +82,8 @@ export interface UpdateLinkOptions {
   expiresAt?: string;
   /** Maximum number of clicks before the link expires */
   maxClicks?: number;
+  /** URL to redirect to when the link expires (by date or click cap), instead of showing an error page */
+  expireFallbackUrl?: string;
   /** Country-based routing rules */
   routingRules?: RoutingRule[];
   /** Open Graph metadata overrides */
@@ -144,6 +148,8 @@ export interface Link {
   expiresAt: string | null;
   /** Maximum clicks limit */
   maxClicks: number | null;
+  /** URL to redirect to when the link expires, instead of showing an error page */
+  expireFallbackUrl?: string | null;
   /** Whether this is a custom slug link */
   isCustom: boolean;
   /** Folder ID if assigned */
