@@ -128,6 +128,30 @@ console.log(stats.totalClicks);
 console.log(stats.clicks); // Array of click events with timestamp, country, device
 ```
 
+#### `client.analytics.getAggregateStats(shortPath, opts?)`
+
+Get rich aggregated analytics for a link over a time window
+(`GET /api/v1/links/:shortPath/stats/aggregate`).
+
+| Parameter | Type                     | Required | Description                          |
+|-----------|--------------------------|----------|--------------------------------------|
+| `period`  | `"7d" \| "30d" \| "90d"` | No       | Time window. Defaults to `"7d"`.     |
+
+The **free tier** returns `countryBreakdown` plus an `upgradeForMore` hint; **paid
+tiers** additionally return device/referrer/browser/OS/hour/source/UTM breakdowns
+depending on the plan.
+
+Returns: `AggregateStats`
+
+```typescript
+const agg = await client.analytics.getAggregateStats("abc123", { period: "30d" });
+console.log(agg.totalClicks, agg.uniqueVisitors);
+console.log(agg.clicksByDay);        // [{ date, clicks }, ...]
+console.log(agg.countryBreakdown);   // { US: 300, DE: 120, ... }
+console.log(agg.deviceBreakdown);    // paid tier only — { mobile, desktop, tablet }
+console.log(agg.upgradeForMore);     // free tier only — upgrade hint
+```
+
 ---
 
 ### QR Codes
@@ -271,6 +295,89 @@ console.log(session.country);      // resolved click country, or null
 
 A missing or expired token throws `AwsysNotFoundError`; a malformed token
 throws `AwsysValidationError`.
+
+---
+
+### Imports
+
+Migrate links from an external provider (e.g. Bitly) into AWSYS.CO. Requires a
+paid tier.
+
+#### `client.imports.start(opts)`
+
+Start a new import job.
+
+| Parameter         | Type      | Required | Description                                   |
+|-------------------|-----------|----------|-----------------------------------------------|
+| `provider`        | `string`  | Yes      | Source provider (e.g. `"bitly"`)              |
+| `accessToken`     | `string`  | Yes      | Provider access token                         |
+| `targetNamespace` | `string`  | No       | Branded namespace to write imported links into|
+| `scanOnly`        | `boolean` | No       | Dry run — fetch/transform without writing      |
+
+Returns: `ImportJob`
+
+```typescript
+const job = await client.imports.start({
+  provider: "bitly",
+  accessToken: "bitly_access_token",
+  scanOnly: true, // preview without writing
+});
+console.log(job.id, job.status);
+```
+
+Possible errors: `AwsysValidationError` (`UNSUPPORTED_PROVIDER` /
+`INVALID_ACCESS_TOKEN`), `AwsysConflictError` (`IMPORT_JOB_BUSY` — an import is
+already running), `AwsysForbiddenError` (`PAID_TIER_REQUIRED`).
+
+#### `client.imports.getStatus(jobId)`
+
+Get the current status of an import job.
+
+```typescript
+const job = await client.imports.getStatus("imp_123");
+console.log(job.status, job.counts); // { fetched, transformed, written, errored }
+```
+
+#### `client.imports.cancel(jobId)`
+
+Cancel a running import job.
+
+```typescript
+await client.imports.cancel("imp_123");
+```
+
+#### `client.imports.list(opts?)`
+
+List the authenticated user's import jobs (most recent first).
+
+| Parameter | Type     | Required | Description                  |
+|-----------|----------|----------|------------------------------|
+| `limit`   | `number` | No       | Max number of jobs to return |
+
+```typescript
+const jobs = await client.imports.list({ limit: 10 });
+```
+
+#### `client.imports.waitForCompletion(jobId, opts?)`
+
+Poll an import job until it reaches a terminal status (`completed`, `partial`,
+`failed`, or `cancelled`) or the timeout elapses.
+
+| Parameter        | Type     | Required | Description                          |
+|------------------|----------|----------|--------------------------------------|
+| `pollIntervalMs` | `number` | No       | Poll interval. Defaults to `2000`.   |
+| `timeoutMs`      | `number` | No       | Max wait. Defaults to `120000`.      |
+
+Throws an `Error` if the job has not finished before the timeout.
+
+```typescript
+const job = await client.imports.start({ provider: "bitly", accessToken: "..." });
+const finished = await client.imports.waitForCompletion(job.id, {
+  pollIntervalMs: 3000,
+  timeoutMs: 300000,
+});
+console.log(finished.status, finished.counts.written);
+```
 
 ---
 

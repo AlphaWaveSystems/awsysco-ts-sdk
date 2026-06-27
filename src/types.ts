@@ -169,7 +169,14 @@ export interface ClickEvent {
   userAgent: string | null;
 }
 
-export interface AggregateStats {
+/**
+ * Compact per-link breakdown nested inside {@link LinkStats}.
+ *
+ * NOTE: this was previously named `AggregateStats`. It was renamed in 1.3.0 to
+ * free up the `AggregateStats` name for the richer
+ * `client.analytics.getAggregateStats()` response (see below).
+ */
+export interface LinkAggregateStats {
   countries: Record<string, number>;
   devices: Record<string, number>;
   browsers: Record<string, number>;
@@ -181,7 +188,40 @@ export interface LinkStats {
   fullPath: string | null;
   totalClicks: number;
   clicks: ClickEvent[];
-  aggregateStats?: AggregateStats;
+  aggregateStats?: LinkAggregateStats;
+}
+
+/**
+ * Rich aggregated analytics for a single link, returned by
+ * `client.analytics.getAggregateStats()`
+ * (`GET /api/v1/links/:shortPath/stats/aggregate`).
+ *
+ * The free tier returns `countryBreakdown` plus `upgradeForMore`; the paid-tier
+ * breakdown fields (device/referrer/browser/os/hour/source/utm) are present only
+ * for plans that include the corresponding analytics dimension.
+ */
+export interface AggregateStats {
+  shortCode: string;
+  fullPath: string | null;
+  period: string;
+  totalClicks: number;
+  uniqueVisitors: number;
+  clicksByDay: { date: string; clicks: number }[];
+  countryBreakdown: Record<string, number>;
+  tierLimit: number;
+  tier: string;
+  deviceBreakdown?: { mobile: number; desktop: number; tablet: number };
+  referrerBreakdown?: Record<string, number>;
+  browserBreakdown?: Record<string, number>;
+  osBreakdown?: Record<string, number>;
+  hourBreakdown?: { hour: number; clicks: number }[];
+  sourceBreakdown?: Record<string, number>;
+  utmBreakdown?: {
+    sources: Record<string, number>;
+    mediums: Record<string, number>;
+    campaigns: Record<string, number>;
+  };
+  upgradeForMore?: { available: string[]; message: string };
 }
 
 // ─── QR Codes ────────────────────────────────────────────────────────────────
@@ -334,6 +374,34 @@ export interface Web2AppSession {
   routingRule: Record<string, unknown> | null;
   country: string | null;
   clickedAt: string | null;
+}
+
+// ─── Imports ─────────────────────────────────────────────────────────────────
+
+/**
+ * An import job that migrates links from an external provider (e.g. Bitly) into
+ * AWSYS.CO. Returned by all `client.imports.*` methods.
+ *
+ * `status` progresses through provider-specific intermediate states and settles
+ * on one of the terminal states: `completed`, `partial`, `failed`, `cancelled`.
+ */
+export interface ImportJob {
+  id: string;
+  userId: string;
+  provider: string;
+  status: string;
+  scanOnly: boolean;
+  targetNamespace: string | null;
+  scopeFilter: string | null;
+  counts: {
+    fetched: number;
+    transformed: number;
+    written: number;
+    errored: number;
+  };
+  errors: string[];
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 // ─── Tags ────────────────────────────────────────────────────────────────────

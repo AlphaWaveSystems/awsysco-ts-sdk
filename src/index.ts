@@ -20,6 +20,7 @@ export { BulkResource } from "./resources/bulk.js";
 export { CustomDomainsResource } from "./resources/customDomains.js";
 export { DataExportResource } from "./resources/dataExport.js";
 export { FoldersResource } from "./resources/folders.js";
+export { ImportsResource } from "./resources/imports.js";
 export { LinksResource } from "./resources/links.js";
 export { MeResource } from "./resources/me.js";
 export { NamespaceResource } from "./resources/namespace.js";
@@ -31,6 +32,12 @@ export { UsageResource } from "./resources/usage.js";
 export { UtmTemplatesResource } from "./resources/utmTemplates.js";
 export { Web2AppResource } from "./resources/web2app.js";
 export { WebhooksResource } from "./resources/webhooks.js";
+
+// Resource option types
+export type {
+  StartImportOptions,
+  WaitForCompletionOptions,
+} from "./resources/imports.js";
 
 // Types
 export type {
@@ -56,7 +63,9 @@ export type {
   CustomDomain,
   Folder,
   GeoRestriction,
+  ImportJob,
   Link,
+  LinkAggregateStats,
   LinkStats,
   ListLinksOptions,
   Me,
