@@ -13,7 +13,9 @@ import { QRResource } from "./resources/qr.js";
 import { SavedViewsResource } from "./resources/savedViews.js";
 import { TagsResource } from "./resources/tags.js";
 import { TrustScoreResource } from "./resources/trustScore.js";
+import { UsageResource } from "./resources/usage.js";
 import { UtmTemplatesResource } from "./resources/utmTemplates.js";
+import { Web2AppResource } from "./resources/web2app.js";
 import { WebhooksResource } from "./resources/webhooks.js";
 import type { AwsysClientConfig } from "./types.js";
 
@@ -65,6 +67,10 @@ export class AwsysClient {
   readonly agentlink: AgentlinkResource;
   /** Affiliate resource — manage affiliate programs and partnerships */
   readonly affiliate: AffiliateResource;
+  /** Usage resource — live consumption stats against plan limits */
+  readonly usage: UsageResource;
+  /** Web2App resource — consume web-to-app deferred deep-link sessions */
+  readonly web2app: Web2AppResource;
 
   constructor(config: AwsysClientConfig) {
     if (!config.apiKey) {
@@ -90,5 +96,7 @@ export class AwsysClient {
     this.customDomains = new CustomDomainsResource(http);
     this.agentlink = new AgentlinkResource(http);
     this.affiliate = new AffiliateResource(http);
+    this.usage = new UsageResource(http);
+    this.web2app = new Web2AppResource(http);
   }
 }

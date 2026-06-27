@@ -234,6 +234,46 @@ console.log(me.limits?.apiCallsPerMonth);
 
 ---
 
+### Usage
+
+#### `client.usage.get()`
+
+Get the authenticated user's **live consumption** stats — current usage against
+plan limits (links/clicks/QR codes/API calls used this period, overage state).
+This is distinct from `client.me.get()`, which returns the static profile and
+plan limits rather than live consumption.
+
+```typescript
+const usage = await client.usage.get();
+console.log(usage.totalLinks);              // links created all-time
+console.log(usage.linksCreatedThisMonth);   // usage this billing period
+console.log(usage.trackedClicksThisMonth);
+console.log(usage.limits.monthlyTrackedClicks); // number | "unlimited"
+console.log(usage.overage.active);          // overage billing state
+```
+
+---
+
+### Web2App
+
+#### `client.web2app.consumeSession(token)`
+
+Consume a web-to-app deferred-deep-link session by its token. The token is
+**single-use** (consumed on read) and has a **24-hour TTL**.
+
+```typescript
+const session = await client.web2app.consumeSession("tok_abc123");
+console.log(session.linkId);
+console.log(session.utmParams);    // Record<string, string>
+console.log(session.routingRule);  // Record<string, unknown> | null
+console.log(session.country);      // resolved click country, or null
+```
+
+A missing or expired token throws `AwsysNotFoundError`; a malformed token
+throws `AwsysValidationError`.
+
+---
+
 ## Error Handling
 
 All API errors throw a typed error class:

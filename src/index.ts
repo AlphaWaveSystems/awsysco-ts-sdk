@@ -27,7 +27,9 @@ export { QRResource } from "./resources/qr.js";
 export { SavedViewsResource } from "./resources/savedViews.js";
 export { TagsResource } from "./resources/tags.js";
 export { TrustScoreResource } from "./resources/trustScore.js";
+export { UsageResource } from "./resources/usage.js";
 export { UtmTemplatesResource } from "./resources/utmTemplates.js";
+export { Web2AppResource } from "./resources/web2app.js";
 export { WebhooksResource } from "./resources/webhooks.js";
 
 // Types
@@ -76,7 +78,11 @@ export type {
   UpdateLinkOptions,
   UpdateSavedViewOptions,
   UpdateWebhookOptions,
+  UsageLimits,
+  UsageOverage,
+  UsageStats,
   UtmTemplate,
+  Web2AppSession,
   Webhook,
   WebhookEventType,
 } from "./types.js";
