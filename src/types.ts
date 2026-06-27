@@ -171,12 +171,8 @@ export interface ClickEvent {
 
 /**
  * Compact per-link breakdown nested inside {@link LinkStats}.
- *
- * NOTE: this was previously named `AggregateStats`. It was renamed in 1.3.0 to
- * free up the `AggregateStats` name for the richer
- * `client.analytics.getAggregateStats()` response (see below).
  */
-export interface LinkAggregateStats {
+export interface AggregateStats {
   countries: Record<string, number>;
   devices: Record<string, number>;
   browsers: Record<string, number>;
@@ -188,7 +184,7 @@ export interface LinkStats {
   fullPath: string | null;
   totalClicks: number;
   clicks: ClickEvent[];
-  aggregateStats?: LinkAggregateStats;
+  aggregateStats?: AggregateStats;
 }
 
 /**
@@ -200,7 +196,7 @@ export interface LinkStats {
  * breakdown fields (device/referrer/browser/os/hour/source/utm) are present only
  * for plans that include the corresponding analytics dimension.
  */
-export interface AggregateStats {
+export interface AggregateAnalytics {
   shortCode: string;
   fullPath: string | null;
   period: string;

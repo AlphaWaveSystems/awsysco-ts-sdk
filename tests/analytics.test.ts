@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { AwsysClient } from "../src/index.js";
 import { AnalyticsResource } from "../src/resources/analytics.js";
 import type { HttpClient } from "../src/http.js";
-import type { AggregateStats } from "../src/types.js";
+import type { AggregateAnalytics } from "../src/types.js";
 
 function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
   return {
@@ -84,7 +84,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
   });
 
   it("GETs the aggregate path with the period query and parses a paid-tier response", async () => {
-    const expected: AggregateStats = {
+    const expected: AggregateAnalytics = {
       shortCode: "abc123",
       fullPath: "acme/abc123",
       period: "30d",
@@ -165,7 +165,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
   });
 
   it("parses a free-tier response with countryBreakdown + upgradeForMore", async () => {
-    const expected: AggregateStats = {
+    const expected: AggregateAnalytics = {
       shortCode: "free99",
       fullPath: null,
       period: "7d",

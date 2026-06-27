@@ -141,7 +141,7 @@ The **free tier** returns `countryBreakdown` plus an `upgradeForMore` hint; **pa
 tiers** additionally return device/referrer/browser/OS/hour/source/UTM breakdowns
 depending on the plan.
 
-Returns: `AggregateStats`
+Returns: `AggregateAnalytics`
 
 ```typescript
 const agg = await client.analytics.getAggregateStats("abc123", { period: "30d" });

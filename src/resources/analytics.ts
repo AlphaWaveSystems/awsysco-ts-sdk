@@ -1,5 +1,5 @@
 import type { HttpClient } from "../http.js";
-import type { AggregateStats, ClickEvent, LinkStats } from "../types.js";
+import type { AggregateAnalytics, ClickEvent, LinkStats } from "../types.js";
 
 export class AnalyticsResource {
   constructor(private readonly http: HttpClient) {}
@@ -34,10 +34,10 @@ export class AnalyticsResource {
   async getAggregateStats(
     shortPath: string,
     opts?: { period?: "7d" | "30d" | "90d" },
-  ): Promise<AggregateStats> {
+  ): Promise<AggregateAnalytics> {
     const params: Record<string, string | number> = {};
     if (opts?.period !== undefined) params.period = opts.period;
-    return this.http.get<AggregateStats>(
+    return this.http.get<AggregateAnalytics>(
       `/api/v1/links/${encodeURIComponent(shortPath)}/stats/aggregate`,
       params,
     );
