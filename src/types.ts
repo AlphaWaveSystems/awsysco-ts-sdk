@@ -277,6 +277,65 @@ export interface Me {
   limits?: MeLimits;
 }
 
+// ─── Usage ───────────────────────────────────────────────────────────────────
+
+export interface UsageLimits {
+  linksPerMonth: number | 'unlimited';
+  monthlyLinks: number | 'unlimited';
+  dailyLinks: number | 'unlimited';
+  monthlyTrackedClicks: number | 'unlimited';
+  apiCallsPerMonth: number;
+  qrCodes: number | 'unlimited';
+  folders: number | 'unlimited';
+  customSlugs: number;
+}
+
+export interface UsageOverage {
+  active: boolean;
+  startedAt: string | null;
+  expiresAt: string | null;
+  hoursUntilDrop: number | null;
+  clicksThisCycle: number;
+  spendingLimitCents: number;
+  estimatedChargeCents: number;
+}
+
+/**
+ * Live consumption stats for the authenticated user.
+ *
+ * Distinct from {@link Me} (`client.me.get()`), which returns the static
+ * profile/plan limits — this returns the user's *current* consumption against
+ * those limits (links/clicks/QR codes/API calls used this period, overage
+ * state, etc.).
+ */
+export interface UsageStats {
+  totalLinks: number;
+  totalClicks: number;
+  linksCreatedThisMonth: number;
+  qrCodesThisMonth: number;
+  folderCount: number;
+  apiCallsThisMonth: number;
+  trackedClicksThisMonth: number;
+  tier: string;
+  limits: UsageLimits;
+  hasApiKey: boolean;
+  apiKeyCreatedAt: string | null;
+  userPrefix: string | null;
+  isPremium: boolean;
+  overage: UsageOverage;
+}
+
+// ─── Web2App ─────────────────────────────────────────────────────────────────
+
+export interface Web2AppSession {
+  success: boolean;
+  linkId: string;
+  utmParams: Record<string, string>;
+  routingRule: Record<string, unknown> | null;
+  country: string | null;
+  clickedAt: string | null;
+}
+
 // ─── Tags ────────────────────────────────────────────────────────────────────
 
 export interface TagsResult {
