@@ -6,6 +6,7 @@ import { BulkResource } from "./resources/bulk.js";
 import { CustomDomainsResource } from "./resources/customDomains.js";
 import { DataExportResource } from "./resources/dataExport.js";
 import { FoldersResource } from "./resources/folders.js";
+import { ImportsResource } from "./resources/imports.js";
 import { LinksResource } from "./resources/links.js";
 import { MeResource } from "./resources/me.js";
 import { NamespaceResource } from "./resources/namespace.js";
@@ -71,6 +72,8 @@ export class AwsysClient {
   readonly usage: UsageResource;
   /** Web2App resource — consume web-to-app deferred deep-link sessions */
   readonly web2app: Web2AppResource;
+  /** Imports resource — migrate links from external providers (e.g. Bitly) */
+  readonly imports: ImportsResource;
 
   constructor(config: AwsysClientConfig) {
     if (!config.apiKey) {
@@ -98,5 +101,6 @@ export class AwsysClient {
     this.affiliate = new AffiliateResource(http);
     this.usage = new UsageResource(http);
     this.web2app = new Web2AppResource(http);
+    this.imports = new ImportsResource(http);
   }
 }
