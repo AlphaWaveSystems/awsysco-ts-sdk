@@ -1,13 +1,13 @@
 <!-- HARNESS:START
-     version=0.32.0
+     version=0.33.0
      schema=1
-     updated=2026-07-18T02:25:54Z
+     updated=2026-07-19T05:36:09Z
      DO NOT EDIT — regenerate with: harness-ctl update /Users/patrickbertsch/dev/awsysco-ts-sdk
 -->
 
 # Architecture — @awsysco/sdk
 
-> Auto-generated from constitution scan on 2026-07-18T02:25:54Z.
+> Auto-generated from constitution scan on 2026-07-19T05:36:09Z.
 > Reflects the state of the repo at install time — update manually as the project evolves,
 > or re-run `harness-ctl update /Users/patrickbertsch/dev/awsysco-ts-sdk` to refresh from the latest scan.
 
@@ -19,10 +19,10 @@
 |---|---|
 | Name | @awsysco/sdk |
 | Path | `/Users/patrickbertsch/dev/awsysco-ts-sdk` |
-| Repository | https://github.com/AlphaWaveSystems/awsysco-ts-sdk.git |
+| Repository | (not a git repo) |
 | Stack | typescript |
 | Language(s) | TypeScript, JavaScript |
-| Runtime | Node.js v22.23.1 |
+| Runtime | (not detected) |
 | Package manager | npm |
 | Zeus owner | `hephaestus` |
 
@@ -223,15 +223,15 @@ TypeScript project. Entry point at `src/index.ts`.
 
 **Dev dependencies:**
 
-- `@types/node` ^20.0.0
-
-- `@vitest/coverage-v8` ^1.0.0
-
-- `dotenv` ^16.0.0
-
 - `tsup` ^8.0.0
 
 - `typescript` ^5.0.0
+
+- `vitest` ^1.0.0
+
+- `@types/node` ^20.0.0
+
+- `@vitest/coverage-v8` ^1.0.0
 
 
 ---
@@ -265,10 +265,10 @@ Variables the project reads at runtime. Do not commit values — use the harness
 Rules extracted from `CLAUDE.md` at install time:
 
 <!-- HARNESS:START
-     version=0.31.0
+     version=0.32.0
      schema=1
      agent=awsysco-ts-sdk
-     updated=2026-07-04T02:31:42Z
+     updated=2026-07-18T02:25:54Z
      DO NOT EDIT THIS BLOCK — regenerate with: harness-ctl update /Users/patrickbertsch/dev/awsysco-ts-sdk
 -->
 
