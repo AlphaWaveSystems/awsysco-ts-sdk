@@ -70,6 +70,10 @@ function parseRetryAfterSeconds(value: string | null): number | undefined {
   return ms === undefined ? undefined : Math.round(ms / 1000);
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
+}
+
 async function parseErrorBody(response: Response): Promise<ErrorBody> {
   try {
     return (await response.json()) as ErrorBody;
@@ -104,7 +108,9 @@ function throwForStatus(
 
   switch (status) {
     case 400:
-      throw new AwsysValidationError(message, code, raw);
+      throw new AwsysValidationError(message, code, raw, 400);
+    case 422:
+      throw new AwsysValidationError(message, code, raw, 422);
     case 401:
       throw new AwsysAuthError(message, code, raw);
     case 403:
@@ -142,7 +148,9 @@ export class HttpClient {
     timeoutMs?: number,
   ) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl.replace(/\/$/, "");
+    // Trailing-slash stripping happens once, upstream in
+    // `AwsysClient`'s `validateBaseUrl` — `baseUrl` here is already clean.
+    this.baseUrl = baseUrl;
     this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
     this.defaultTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
@@ -193,66 +201,109 @@ export class HttpClient {
         else externalSignal.addEventListener("abort", onExternalAbort, { once: true });
       }
 
-      let response: Response;
+      // The timer/listener stay live for the WHOLE attempt (fetch + body
+      // read), not just the fetch call — otherwise a stalled body read past
+      // the headers can't be aborted by the timeout.
       try {
-        response = await fetch(url, {
-          method,
-          headers,
-          body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
-          signal: controller.signal,
-        });
-      } catch (err) {
-        clearTimeout(timer);
-        if (externalSignal) externalSignal.removeEventListener("abort", onExternalAbort);
+        let response: Response;
+        try {
+          response = await fetch(url, {
+            method,
+            headers,
+            body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
+            signal: controller.signal,
+          });
+        } catch (err) {
+          if (isAbortError(err)) {
+            if (externalSignal?.aborted) {
+              // The caller's own signal fired — a user-initiated cancel,
+              // not a timeout. Let the original abort surface as-is.
+              throw err;
+            }
+            // Our internal timeout fired. Timeouts are not auto-retried —
+            // the caller already waited the full budget.
+            throw new AwsysTimeoutError(
+              `Request timed out after ${timeoutMs}ms`,
+              "TIMEOUT",
+              err,
+            );
+          }
 
-        const isAbort = err instanceof Error && err.name === "AbortError";
-        if (isAbort) {
-          // Our own timeout fired (or the caller's signal aborted). Timeouts
-          // are not auto-retried — the caller already waited the full budget.
-          throw new AwsysTimeoutError(
-            `Request timed out after ${timeoutMs}ms`,
-            "TIMEOUT",
-            err,
-          );
+          const message = err instanceof Error ? err.message : "Network error";
+          if (IDEMPOTENT_METHODS.has(method) && attempt < this.maxRetries) {
+            await sleep(jitteredBackoffMs(attempt));
+            attempt++;
+            continue;
+          }
+          throw new AwsysNetworkError(message, "NETWORK_ERROR", err);
         }
 
-        const message = err instanceof Error ? err.message : "Network error";
-        if (IDEMPOTENT_METHODS.has(method) && attempt < this.maxRetries) {
-          await sleep(jitteredBackoffMs(attempt));
+        if (response.ok) {
+          try {
+            return await parseSuccess(response);
+          } catch (err) {
+            if (isAbortError(err)) {
+              if (externalSignal?.aborted) throw err;
+              throw new AwsysTimeoutError(
+                `Request timed out after ${timeoutMs}ms`,
+                "TIMEOUT",
+                err,
+              );
+            }
+            if (err instanceof SyntaxError) {
+              // A 2xx response with an unparseable body is a server-side
+              // contract violation, not something the caller can act on.
+              throw new AwsysServerError(
+                `Received a successful (${response.status}) response with a malformed body: ${err.message}`,
+                response.status,
+                "MALFORMED_RESPONSE_BODY",
+                undefined,
+              );
+            }
+            throw err;
+          }
+        }
+
+        const body = await parseErrorBody(response);
+        const retryAfterHeader = response.headers.get("Retry-After");
+        const rawRetryAfterMs = parseRetryAfterDelayMs(retryAfterHeader);
+        const retryAfterExceedsCap =
+          rawRetryAfterMs !== undefined &&
+          (!Number.isFinite(rawRetryAfterMs) || rawRetryAfterMs > MAX_DELAY_MS);
+        // Quota-class 429s are never retried — waiting seconds can't help
+        // when the reset is hours away. Detected by `code` OR the mere
+        // presence of `resetsAt` (the contract treats either as sufficient).
+        const isQuota429 =
+          response.status === 429 &&
+          (QUOTA_CODES.has(body.code ?? "") || body.resetsAt !== undefined);
+
+        if (
+          response.status === 429 &&
+          !isQuota429 &&
+          !retryAfterExceedsCap &&
+          attempt < this.maxRetries
+        ) {
+          await sleep(rawRetryAfterMs ?? jitteredBackoffMs(attempt));
           attempt++;
           continue;
         }
-        throw new AwsysNetworkError(message, "NETWORK_ERROR", err);
+
+        if (
+          RETRYABLE_5XX.has(response.status) &&
+          IDEMPOTENT_METHODS.has(method) &&
+          !retryAfterExceedsCap &&
+          attempt < this.maxRetries
+        ) {
+          await sleep(rawRetryAfterMs ?? jitteredBackoffMs(attempt));
+          attempt++;
+          continue;
+        }
+
+        throwForStatus(response.status, body, body, retryAfterHeader, response.statusText);
+      } finally {
+        clearTimeout(timer);
+        if (externalSignal) externalSignal.removeEventListener("abort", onExternalAbort);
       }
-
-      clearTimeout(timer);
-      if (externalSignal) externalSignal.removeEventListener("abort", onExternalAbort);
-
-      if (response.ok) {
-        return parseSuccess(response);
-      }
-
-      const body = await parseErrorBody(response);
-      const retryAfterHeader = response.headers.get("Retry-After");
-      const isQuota429 = response.status === 429 && QUOTA_CODES.has(body.code ?? "");
-
-      if (response.status === 429 && !isQuota429 && attempt < this.maxRetries) {
-        await sleep(parseRetryAfterDelayMs(retryAfterHeader) ?? jitteredBackoffMs(attempt));
-        attempt++;
-        continue;
-      }
-
-      if (
-        RETRYABLE_5XX.has(response.status) &&
-        IDEMPOTENT_METHODS.has(method) &&
-        attempt < this.maxRetries
-      ) {
-        await sleep(parseRetryAfterDelayMs(retryAfterHeader) ?? jitteredBackoffMs(attempt));
-        attempt++;
-        continue;
-      }
-
-      throwForStatus(response.status, body, body, retryAfterHeader, response.statusText);
     }
   }
 

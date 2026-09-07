@@ -106,11 +106,11 @@ export class AwsysRateLimitError extends AwsysError {
 }
 
 /**
- * Thrown when the request payload is invalid (HTTP 400).
+ * Thrown when the request payload is invalid (HTTP 400 or 422).
  */
 export class AwsysValidationError extends AwsysError {
-  constructor(message: string, code: string, raw: unknown) {
-    super(message, 400, code, raw);
+  constructor(message: string, code: string, raw: unknown, status: number = 400) {
+    super(message, status, code, raw);
     this.name = "AwsysValidationError";
     Object.setPrototypeOf(this, new.target.prototype);
   }
