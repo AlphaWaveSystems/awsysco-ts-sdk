@@ -1,4 +1,5 @@
 import type { HttpClient } from "../http.js";
+import { paths } from "../paths.js";
 import type { CreateSavedViewOptions, SavedView, UpdateSavedViewOptions } from "../types.js";
 
 export class SavedViewsResource {
@@ -8,7 +9,7 @@ export class SavedViewsResource {
    * List all saved views for the authenticated user.
    */
   async list(): Promise<{ views: SavedView[] }> {
-    return this.http.get<{ views: SavedView[] }>("/api/views");
+    return this.http.get<{ views: SavedView[] }>(paths.savedViews.base);
   }
 
   /**
@@ -17,7 +18,7 @@ export class SavedViewsResource {
    * @param opts - View creation options including name and filters
    */
   async create(opts: CreateSavedViewOptions): Promise<SavedView> {
-    return this.http.post<SavedView>("/api/views", opts);
+    return this.http.post<SavedView>(paths.savedViews.base, opts);
   }
 
   /**
@@ -27,10 +28,7 @@ export class SavedViewsResource {
    * @param opts - Fields to update
    */
   async update(viewId: string, opts: UpdateSavedViewOptions): Promise<SavedView> {
-    return this.http.patch<SavedView>(
-      `/api/views/${encodeURIComponent(viewId)}`,
-      opts,
-    );
+    return this.http.patch<SavedView>(paths.savedViews.byId(viewId), opts);
   }
 
   /**
@@ -39,8 +37,6 @@ export class SavedViewsResource {
    * @param viewId - The ID of the view to delete
    */
   async delete(viewId: string): Promise<void> {
-    return this.http.delete<void>(
-      `/api/views/${encodeURIComponent(viewId)}`,
-    );
+    return this.http.delete<void>(paths.savedViews.byId(viewId));
   }
 }

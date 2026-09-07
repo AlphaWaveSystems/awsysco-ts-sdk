@@ -92,4 +92,53 @@ export const paths = {
     byIdForUpdate: (webhookId: string): string => `/api/webhooks/${encodeSegment(webhookId)}`,
     test: (webhookId: string): string => `/api/v1/webhooks/${encodeSegment(webhookId)}/test`,
   },
+  affiliate: {
+    programs: "/api/affiliate/programs",
+    programById: (programId: string): string =>
+      `/api/affiliate/programs/${encodeSegment(programId)}`,
+    programStats: (programId: string): string =>
+      `/api/affiliate/programs/${encodeSegment(programId)}/stats`,
+    partners: (programId: string): string =>
+      `/api/affiliate/programs/${encodeSegment(programId)}/partners`,
+    partner: (programId: string, partnerId: string): string =>
+      `/api/affiliate/programs/${encodeSegment(programId)}/partners/${encodeSegment(partnerId)}`,
+    discover: "/api/affiliate/discover",
+    join: (programId: string): string => `/api/affiliate/join/${encodeSegment(programId)}`,
+    partnerships: "/api/affiliate/partnerships",
+    partnershipStats: (partnershipId: string): string =>
+      `/api/affiliate/partnerships/${encodeSegment(partnershipId)}/stats`,
+    partnershipById: (partnershipId: string): string =>
+      `/api/affiliate/partnerships/${encodeSegment(partnershipId)}`,
+    limits: "/api/affiliate/limits",
+  },
+  savedViews: {
+    base: "/api/views",
+    byId: (viewId: string): string => `/api/views/${encodeSegment(viewId)}`,
+  },
+  namespace: {
+    base: "/api/user/namespace",
+    check: (namespace: string): string => `/api/namespace/check/${encodeSegment(namespace)}`,
+  },
+  usage: {
+    stats: "/api/user/stats",
+  },
+  agentlink: {
+    subscribe: "/api/agentlink/subscribe",
+    linkStats: (shortPath: string): string =>
+      `/api/agentlink/links/${encodeSegment(shortPath)}/stats`,
+    accountStats: "/api/agentlink/account/stats",
+  },
+  bulk: {
+    base: "/api/v1/bulk",
+  },
+  dataExport: {
+    links: "/api/export/links",
+    linkStats: (shortPath: string): string => `/api/export/stats/${encodeSegment(shortPath)}`,
+  },
+  me: {
+    base: "/api/v1/me",
+  },
+  trustScore: {
+    scan: (shortPath: string): string => `/api/link-scan/${encodeSegment(shortPath)}`,
+  },
 };

@@ -1,4 +1,5 @@
 import type { HttpClient } from "../http.js";
+import { paths } from "../paths.js";
 
 export class DataExportResource {
   constructor(private readonly http: HttpClient) {}
@@ -9,7 +10,7 @@ export class DataExportResource {
    * @returns Raw CSV text
    */
   async exportLinks(): Promise<string> {
-    return this.http.getText("/api/export/links");
+    return this.http.getText(paths.dataExport.links);
   }
 
   /**
@@ -19,8 +20,6 @@ export class DataExportResource {
    * @returns Raw CSV text
    */
   async exportLinkStats(shortPath: string): Promise<string> {
-    return this.http.getText(
-      `/api/export/stats/${encodeURIComponent(shortPath)}`,
-    );
+    return this.http.getText(paths.dataExport.linkStats(shortPath));
   }
 }

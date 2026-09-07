@@ -1,4 +1,5 @@
 import type { HttpClient } from "../http.js";
+import { paths } from "../paths.js";
 import type { BulkCreateOptions, BulkCreateResult } from "../types.js";
 
 export class BulkResource {
@@ -13,6 +14,6 @@ export class BulkResource {
    * @returns Results for each URL in the request
    */
   async create(opts: BulkCreateOptions): Promise<BulkCreateResult> {
-    return this.http.post<BulkCreateResult>("/api/v1/bulk", opts);
+    return this.http.post<BulkCreateResult>(paths.bulk.base, opts);
   }
 }

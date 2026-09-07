@@ -1,4 +1,5 @@
 import type { HttpClient } from "../http.js";
+import { paths } from "../paths.js";
 import type { NamespaceCheckResult, NamespaceInfo } from "../types.js";
 
 export class NamespaceResource {
@@ -8,7 +9,7 @@ export class NamespaceResource {
    * Get the authenticated user's current namespace info.
    */
   async get(): Promise<NamespaceInfo> {
-    return this.http.get<NamespaceInfo>("/api/user/namespace");
+    return this.http.get<NamespaceInfo>(paths.namespace.base);
   }
 
   /**
@@ -17,9 +18,7 @@ export class NamespaceResource {
    * @param namespace - The namespace string to check
    */
   async check(namespace: string): Promise<NamespaceCheckResult> {
-    return this.http.get<NamespaceCheckResult>(
-      `/api/namespace/check/${encodeURIComponent(namespace)}`,
-    );
+    return this.http.get<NamespaceCheckResult>(paths.namespace.check(namespace));
   }
 
   /**
@@ -28,13 +27,13 @@ export class NamespaceResource {
    * @param namespace - The namespace to claim
    */
   async claim(namespace: string): Promise<NamespaceInfo> {
-    return this.http.post<NamespaceInfo>("/api/user/namespace", { namespace });
+    return this.http.post<NamespaceInfo>(paths.namespace.base, { namespace });
   }
 
   /**
    * Release the authenticated user's current namespace.
    */
   async release(): Promise<{ success: boolean }> {
-    return this.http.delete<{ success: boolean }>("/api/user/namespace");
+    return this.http.delete<{ success: boolean }>(paths.namespace.base);
   }
 }

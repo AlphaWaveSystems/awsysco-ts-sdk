@@ -1,4 +1,5 @@
 import type { HttpClient } from "../http.js";
+import { paths } from "../paths.js";
 import type { AgentLinkStats } from "../types.js";
 
 export class AgentlinkResource {
@@ -11,7 +12,7 @@ export class AgentlinkResource {
    * @param email - The email address to subscribe
    */
   async subscribe(email: string): Promise<{ success: boolean }> {
-    return this.http.post<{ success: boolean }>("/api/agentlink/subscribe", { email });
+    return this.http.post<{ success: boolean }>(paths.agentlink.subscribe, { email });
   }
 
   /**
@@ -23,10 +24,7 @@ export class AgentlinkResource {
   async getLinkStats(shortPath: string, periodDays?: number): Promise<AgentLinkStats> {
     const params: Record<string, string | number> = {};
     if (periodDays !== undefined) params.period = periodDays;
-    return this.http.get<AgentLinkStats>(
-      `/api/agentlink/links/${encodeURIComponent(shortPath)}/stats`,
-      params,
-    );
+    return this.http.get<AgentLinkStats>(paths.agentlink.linkStats(shortPath), params);
   }
 
   /**
@@ -37,6 +35,6 @@ export class AgentlinkResource {
   async getAccountStats(periodDays?: number): Promise<AgentLinkStats> {
     const params: Record<string, string | number> = {};
     if (periodDays !== undefined) params.period = periodDays;
-    return this.http.get<AgentLinkStats>("/api/agentlink/account/stats", params);
+    return this.http.get<AgentLinkStats>(paths.agentlink.accountStats, params);
   }
 }

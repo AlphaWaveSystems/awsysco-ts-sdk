@@ -1,4 +1,5 @@
 import type { HttpClient } from "../http.js";
+import { paths } from "../paths.js";
 import type {
   AffiliatePartner,
   AffiliatePartnership,
@@ -13,7 +14,7 @@ export class AffiliateResource {
    * Create a new affiliate program.
    */
   async createProgram(opts: CreateAffiliateProgramOptions): Promise<AffiliateProgram> {
-    return this.http.post<AffiliateProgram>("/api/affiliate/programs", opts);
+    return this.http.post<AffiliateProgram>(paths.affiliate.programs, opts);
   }
 
   /**
@@ -21,7 +22,7 @@ export class AffiliateResource {
    */
   async listPrograms(): Promise<AffiliateProgram[]> {
     const raw = await this.http.get<{ programs: AffiliateProgram[] }>(
-      "/api/affiliate/programs",
+      paths.affiliate.programs,
     );
     return raw.programs;
   }
@@ -30,9 +31,7 @@ export class AffiliateResource {
    * Get a specific affiliate program by ID.
    */
   async getProgram(programId: string): Promise<AffiliateProgram> {
-    return this.http.get<AffiliateProgram>(
-      `/api/affiliate/programs/${encodeURIComponent(programId)}`,
-    );
+    return this.http.get<AffiliateProgram>(paths.affiliate.programById(programId));
   }
 
   /**
@@ -42,10 +41,7 @@ export class AffiliateResource {
     programId: string,
     opts: Partial<CreateAffiliateProgramOptions>,
   ): Promise<AffiliateProgram> {
-    return this.http.patch<AffiliateProgram>(
-      `/api/affiliate/programs/${encodeURIComponent(programId)}`,
-      opts,
-    );
+    return this.http.patch<AffiliateProgram>(paths.affiliate.programById(programId), opts);
   }
 
   /**
@@ -57,10 +53,7 @@ export class AffiliateResource {
   async getProgramStats(programId: string, period?: string): Promise<Record<string, unknown>> {
     const params: Record<string, string | number> = {};
     if (period !== undefined) params.period = period;
-    return this.http.get<Record<string, unknown>>(
-      `/api/affiliate/programs/${encodeURIComponent(programId)}/stats`,
-      params,
-    );
+    return this.http.get<Record<string, unknown>>(paths.affiliate.programStats(programId), params);
   }
 
   /**
@@ -68,7 +61,7 @@ export class AffiliateResource {
    */
   async listPartners(programId: string): Promise<AffiliatePartner[]> {
     const raw = await this.http.get<{ partners: AffiliatePartner[] }>(
-      `/api/affiliate/programs/${encodeURIComponent(programId)}/partners`,
+      paths.affiliate.partners(programId),
     );
     return raw.partners;
   }
@@ -86,7 +79,7 @@ export class AffiliateResource {
     status: string,
   ): Promise<AffiliatePartner> {
     return this.http.patch<AffiliatePartner>(
-      `/api/affiliate/programs/${encodeURIComponent(programId)}/partners/${encodeURIComponent(partnerId)}`,
+      paths.affiliate.partner(programId, partnerId),
       { status },
     );
   }
@@ -100,7 +93,7 @@ export class AffiliateResource {
     const params: Record<string, string | number> = {};
     if (limit !== undefined) params.limit = limit;
     const raw = await this.http.get<{ programs: AffiliateProgram[] }>(
-      "/api/affiliate/discover",
+      paths.affiliate.discover,
       params,
     );
     return raw.programs;
@@ -115,10 +108,7 @@ export class AffiliateResource {
   async join(programId: string, partnerCode?: string): Promise<AffiliatePartnership> {
     const body: Record<string, string> = {};
     if (partnerCode !== undefined) body.partnerCode = partnerCode;
-    return this.http.post<AffiliatePartnership>(
-      `/api/affiliate/join/${encodeURIComponent(programId)}`,
-      body,
-    );
+    return this.http.post<AffiliatePartnership>(paths.affiliate.join(programId), body);
   }
 
   /**
@@ -126,7 +116,7 @@ export class AffiliateResource {
    */
   async listPartnerships(): Promise<AffiliatePartnership[]> {
     const raw = await this.http.get<{ partnerships: AffiliatePartnership[] }>(
-      "/api/affiliate/partnerships",
+      paths.affiliate.partnerships,
     );
     return raw.partnerships;
   }
@@ -143,10 +133,7 @@ export class AffiliateResource {
   ): Promise<Record<string, unknown>> {
     const params: Record<string, string | number> = {};
     if (period !== undefined) params.period = period;
-    return this.http.get<Record<string, unknown>>(
-      `/api/affiliate/partnerships/${encodeURIComponent(partnershipId)}/stats`,
-      params,
-    );
+    return this.http.get<Record<string, unknown>>(paths.affiliate.partnershipStats(partnershipId), params);
   }
 
   /**
@@ -155,9 +142,7 @@ export class AffiliateResource {
    * @param partnershipId - The partnership ID to leave
    */
   async leaveProgram(partnershipId: string): Promise<{ success: boolean }> {
-    return this.http.delete<{ success: boolean }>(
-      `/api/affiliate/partnerships/${encodeURIComponent(partnershipId)}`,
-    );
+    return this.http.delete<{ success: boolean }>(paths.affiliate.partnershipById(partnershipId));
   }
 
   /**
@@ -165,7 +150,7 @@ export class AffiliateResource {
    */
   async getLimits(): Promise<{ tier: string; limits: Record<string, unknown>; usage: Record<string, unknown> }> {
     return this.http.get<{ tier: string; limits: Record<string, unknown>; usage: Record<string, unknown> }>(
-      "/api/affiliate/limits",
+      paths.affiliate.limits,
     );
   }
 }
