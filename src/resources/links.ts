@@ -94,8 +94,11 @@ export class LinksResource {
    *
    * @param shortPath - The short code (e.g. "abc123") or namespaced path (e.g. "ns/slug")
    */
-  async get(shortPath: string): Promise<Link> {
-    return this.http.get<Link>(paths.links.byShortPath(shortPath));
+  async get(
+    shortPath: string,
+    options?: { signal?: AbortSignal; timeoutMs?: number },
+  ): Promise<Link> {
+    return this.http.get<Link>(paths.links.byShortPath(shortPath), undefined, options);
   }
 
   /**

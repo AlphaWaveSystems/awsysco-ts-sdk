@@ -25,6 +25,9 @@ import type { AwsysClientConfig } from "./types.js";
 
 export const DEFAULT_BASE_URL = "https://awsys.co";
 
+let keyPrefixWarned = false;
+let insecureBaseUrlWarned = false;
+
 /**
  * The main entry point for the AWSYS.CO SDK.
  *
@@ -95,7 +98,24 @@ export class AwsysClient {
       );
     }
 
+    if (!apiKey.startsWith("awsys_") && !keyPrefixWarned) {
+      keyPrefixWarned = true;
+      console.warn(
+        "[@awsysco/sdk] The configured API key does not look like an AWSYS API key " +
+          '(expected it to start with "awsys_"). Requests will still be sent — this is ' +
+          "just a sanity check in case the wrong value was configured.",
+      );
+    }
+
     const baseUrl = validateBaseUrl(config.baseUrl ?? env?.AWSYS_BASE_URL ?? DEFAULT_BASE_URL);
+
+    if (baseUrl.startsWith("http://") && !insecureBaseUrlWarned) {
+      insecureBaseUrlWarned = true;
+      console.warn(
+        `[@awsysco/sdk] baseUrl "${baseUrl}" uses http:// instead of https:// — the API key ` +
+          "will be sent unencrypted. Use https:// unless you know exactly what you're doing.",
+      );
+    }
 
     this.redactedApiKey =
       apiKey.length > 4 ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}` : "awsys_...";
