@@ -61,16 +61,23 @@ afterEach(() => {
 });
 
 /**
- * Every scenario ID exercised by a test in this file, populated as tests
- * run. Checked at the end (see "Contract: coverage" below) against the full
- * fixture so an un-mapped capability fails loudly instead of being silently
- * absent from the suite.
+ * Every scenario ID this file exercises, derived by statically scanning this
+ * file's OWN source text for `scenario("...")`/`mockScenario("...")`/
+ * `markCovered("...")` calls — not by recording which tests actually ran.
+ * A runtime-populated Set would under-report coverage (and thus under- or
+ * over-fail) whenever the suite runs under `--shard` or `.only`, since only
+ * executed test bodies would register their IDs. Static text analysis is
+ * collection-time, not execution-time, so it's correct regardless of which
+ * subset of tests actually run.
  */
-const coveredIds = new Set<string>();
+const coveredIds = new Set(
+  [...readFileSync(fileURLToPath(import.meta.url), "utf-8").matchAll(
+    /(?:mockScenario|markCovered|scenario)\(\s*"([^"]+)"/g,
+  )].map((m) => m[1]),
+);
 
 /** Marks a scenario as covered without mocking fetch (e.g. for a scenario the SDK deliberately never calls). */
 function markCovered(id: string): ReturnType<typeof scenario> {
-  coveredIds.add(id);
   return scenario(id);
 }
 
@@ -361,7 +368,13 @@ describe("Contract: capabilities — bulk / me / usage", () => {
     const s = mockScenario("usage");
     const result = await client.usage.get();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // The SDK adds `linksCreatedThisMonth` as a deprecated alias mapped
+    // from the wire's `linksCreatedToday` — not present in the raw fixture.
+    expect(result).toEqual({
+      ...(s.response.body as Record<string, unknown>),
+      linksCreatedThisMonth: (s.response.body as { linksCreatedToday?: number })
+        .linksCreatedToday,
+    });
   });
 });
 
@@ -734,14 +747,26 @@ describe("Contract: capabilities — trustScore", () => {
     const s = mockScenario("trust_scan");
     const result = await client.trustScore.scan("abc123");
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // The SDK adds short/score/status as deprecated aliases mapped from
+    // the wire's shortCode/trustScore/trustStatus — not in the raw fixture.
+    const body = s.response.body as {
+      shortCode: string;
+      trustScore: number | null;
+      trustStatus: string;
+    };
+    expect(result).toEqual({
+      ...body,
+      short: body.shortCode,
+      score: body.trustScore,
+      status: body.trustStatus,
+    });
   });
 });
 
 describe("Contract: coverage", () => {
   it("every capability scenario is exercised by a test in this file (Gate 3)", () => {
-    // Depends on every `it` above having already run and populated
-    // `coveredIds` — this must stay the last test in the file.
+    // `coveredIds` is derived statically (see above), so this holds
+    // regardless of test order, `--shard`, or `.only` elsewhere in the run.
     const missing = contract.capabilities
       .map((c) => c.id)
       .filter((id) => !coveredIds.has(id));

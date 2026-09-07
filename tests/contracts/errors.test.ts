@@ -39,6 +39,19 @@ function scenario(id: string) {
   return found;
 }
 
+/**
+ * Every scenario ID this file exercises, derived by statically scanning this
+ * file's OWN source text for `scenario("...")` calls — not by recording
+ * which tests actually ran. See the identical pattern (and rationale) in
+ * `capabilities.test.ts`; this is collection-time, not execution-time, so
+ * it stays correct under `--shard`/`.only`.
+ */
+const coveredErrorIds = new Set(
+  [...readFileSync(fileURLToPath(import.meta.url), "utf-8").matchAll(
+    /scenario\(\s*"([^"]+)"/g,
+  )].map((m) => m[1]),
+);
+
 function jsonOrTextResponse(
   status: number,
   body: unknown,
@@ -212,12 +225,69 @@ describe("Contract: error mapping (no retry involved)", () => {
     expect(err.message).not.toContain("<html>");
   });
 
+  it("err_422_validation → AwsysValidationError, status 422", async () => {
+    const s = scenario("err_422_validation");
+    fetchMock.mockResolvedValueOnce(jsonOrTextResponse(s.status!, s.body));
+    const err = await client.links.create({ url: "https://example.com/" }).catch((e) => e);
+    expect(err).toBeInstanceOf(AwsysValidationError);
+    expect(err.status).toBe(422);
+    expect(err.code).toBe("VALIDATION_FAILED");
+  });
+
+  it("err_429_resets_at_only → AwsysRateLimitError, quota-class via resetsAt alone, not retried", async () => {
+    const s = scenario("err_429_resets_at_only");
+    fetchMock.mockResolvedValueOnce(jsonOrTextResponse(s.status!, s.body));
+    const err = await client.links.get("abc123").catch((e) => e);
+    expect(err).toBeInstanceOf(AwsysRateLimitError);
+    expect(err.resetsAt).toBe((s.body as { resetsAt: string }).resetsAt);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("err_429_retry_after_oversized → AwsysRateLimitError raised immediately, Retry-After above the cap is never slept", async () => {
+    const s = scenario("err_429_retry_after_oversized");
+    fetchMock.mockResolvedValueOnce(jsonOrTextResponse(s.status!, s.body, s.headers));
+    const err = await client.links.get("abc123").catch((e) => e);
+    expect(err).toBeInstanceOf(AwsysRateLimitError);
+    expect(err.retryAfter).toBe(86400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("err_network → AwsysNetworkError on POST (non-idempotent, no retry)", async () => {
     scenario("err_network");
     fetchMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
     const err = await client.links.create({ url: "https://example.com/" }).catch((e) => e);
     expect(err).toBeInstanceOf(AwsysNetworkError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("err_2xx_malformed_json → SDK error (AwsysServerError), never a raw parse exception", async () => {
+    const s = scenario("err_2xx_malformed_json");
+    fetchMock.mockResolvedValueOnce(jsonOrTextResponse(s.status!, s.body));
+    const err = await client.links.get("abc123").catch((e) => e);
+    expect(err).toBeInstanceOf(AwsysServerError);
+    expect(err.status).toBe(200);
+  });
+
+  it("err_user_cancel → the caller's own AbortSignal surfaces as-is, not as AwsysTimeoutError", async () => {
+    scenario("err_user_cancel");
+    const controller = new AbortController();
+    fetchMock.mockImplementationOnce(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            const err = new Error("The operation was aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        }),
+    );
+
+    const promise = client.links.get("abc123", { signal: controller.signal }).catch((e) => e);
+    controller.abort();
+    const err = await promise;
+
+    expect(err).not.toBeInstanceOf(AwsysTimeoutError);
+    expect((err as Error).name).toBe("AbortError");
   });
 });
 
@@ -310,5 +380,20 @@ describe("Contract: retry-sensitive error scenarios (fake timers, no real sleeps
     expect(err).toBeInstanceOf(AwsysTimeoutError);
     expect(err).toBeInstanceOf(AwsysNetworkError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Contract: error coverage", () => {
+  it("every error scenario is exercised by a test in this file (Gate 3)", () => {
+    const missing = contract.errors
+      .map((e) => e.id)
+      .filter((id) => !coveredErrorIds.has(id));
+
+    if (missing.length > 0) {
+      throw new Error(
+        `${missing.length}/${contract.errors.length} error scenario(s) not yet mapped to a test:\n` +
+          missing.map((id) => `  - ${id}`).join("\n"),
+      );
+    }
   });
 });

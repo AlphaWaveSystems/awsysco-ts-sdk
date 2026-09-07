@@ -1,6 +1,6 @@
 {
  "$schema": "awsys-sdk-contract/1",
- "version": "1.0.4",
+ "version": "1.0.5",
  "platformBaseline": "2026-09",
  "baseUrl": "https://awsys.co",
  "auth": {
@@ -1976,6 +1976,57 @@
    },
    "expect_error": "AuthorizationError",
    "note": "recent clicks behind feature flag; not a path error"
+  },
+  {
+   "id": "err_422_validation",
+   "status": 422,
+   "body": {
+    "error": true,
+    "code": "VALIDATION_FAILED",
+    "message": "expiresAt must be in the future"
+   },
+   "expect_error": "ValidationError",
+   "note": "422 maps to ValidationError and reports status 422"
+  },
+  {
+   "id": "err_429_resets_at_only",
+   "status": 429,
+   "body": {
+    "error": true,
+    "message": "Limit exceeded",
+    "resetsAt": "2026-10-01T00:00:00Z"
+   },
+   "expect_error": "RateLimitError",
+   "retry": false,
+   "note": "resetsAt present with no quota code \u2192 quota-class, never retried"
+  },
+  {
+   "id": "err_429_retry_after_oversized",
+   "status": 429,
+   "body": {
+    "error": true,
+    "message": "Too many requests"
+   },
+   "headers": {
+    "Retry-After": "86400"
+   },
+   "expect_error": "RateLimitError",
+   "retry": false,
+   "note": "Retry-After above the 30s cap \u2192 raise immediately with retry_after=86400, do not sleep"
+  },
+  {
+   "id": "err_2xx_malformed_json",
+   "status": 200,
+   "body": "<html>interstitial</html>",
+   "expect_error": "SDKError",
+   "note": "non-JSON 2xx body must surface as an SDK error (ServerError acceptable), never a raw parse exception"
+  },
+  {
+   "id": "err_user_cancel",
+   "status": null,
+   "body": null,
+   "expect_error": "CancelledError",
+   "note": "caller-initiated cancellation (signal/ctx) must not be reported as TimeoutError; idiomatic: TS distinct error or rethrown AbortError, Python asyncio.CancelledError passthrough, Go ctx.Err()"
   }
  ],
  "behaviors": [
@@ -2010,6 +2061,18 @@
   {
    "id": "iterator_links",
    "assert": "list_all over scenarios list_links \u2192 list_links_last_page yields 3 links with 2 requests"
+  },
+  {
+   "id": "body_read_within_timeout",
+   "assert": "timeout covers headers AND body read; a server that sends headers then stalls the body raises TimeoutError"
+  },
+  {
+   "id": "config_warnings",
+   "assert": "key not starting with awsys_ and non-https base URL each emit one warning-level log line"
+  },
+  {
+   "id": "release_tag_matches_version",
+   "assert": "publish/release workflow fails if the git tag does not equal v<package version>"
   }
  ]
 }

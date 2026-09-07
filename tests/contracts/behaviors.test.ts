@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AwsysClient } from "../../src/index.js";
-import { AwsysConfigurationError, AwsysAuthError } from "../../src/errors.js";
+import { AwsysConfigurationError, AwsysAuthError, AwsysTimeoutError } from "../../src/errors.js";
 import { parseTimestamp } from "../../src/timestamps.js";
 import type { AwsysClientConfig } from "../../src/types.js";
 
@@ -29,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 // Behaviors scoped to Milestone 1 (contracts/sdk-contract.json `behaviors[]`):
@@ -44,6 +45,9 @@ afterEach(() => {
 //     itself does not transform response bodies for any other field either,
 //     so this is opt-in rather than applied automatically. See ADR-017:
 //     returns an ISO string, not a Date, for the 1.x line.)
+//
+// Added post-milestone-3 (PR #10 review fixes, fixture 1.0.5):
+//   - body_read_within_timeout, config_warnings, release_tag_matches_version
 
 describe("Contract: behaviors — auth_header", () => {
   it("sends Authorization: Bearer <key> on every authenticated request", async () => {
@@ -243,5 +247,83 @@ describe("Contract: behaviors — timestamp_variants", () => {
     expect(parseTimestamp(null)).toBe(null);
     expect(parseTimestamp(undefined)).toBe(undefined);
     expect(parseTimestamp(42)).toBe(42);
+  });
+});
+
+describe("Contract: behaviors — body_read_within_timeout", () => {
+  it("a body read that stalls past the timeout raises AwsysTimeoutError (timer covers the whole attempt, not just headers)", async () => {
+    vi.useFakeTimers();
+    const client = new AwsysClient({
+      apiKey: "awsys_test_key",
+      baseUrl: "https://awsys.co",
+      timeoutMs: 50,
+    });
+
+    // Headers arrive immediately (fetch() resolves), but .json() never
+    // settles on its own — only when the SAME AbortSignal used for the
+    // fetch call fires, exactly as a real stalled body read would behave.
+    // If the timeout timer were cleared right after fetch() resolves (the
+    // bug this test guards against), this would hang forever instead of
+    // rejecting.
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      const response = new Response(null, { status: 200 });
+      response.json = () =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            const err = new Error("The operation was aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        });
+      return Promise.resolve(response);
+    });
+
+    const promise = client.links.get("abc123").catch((e) => e);
+    await vi.advanceTimersByTimeAsync(1000);
+    const err = await promise;
+
+    expect(err).toBeInstanceOf(AwsysTimeoutError);
+  });
+});
+
+describe("Contract: behaviors — config_warnings", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("an API key not starting with awsys_ emits one warning-level log line", () => {
+    new AwsysClient({ apiKey: "not-an-awsys-key", baseUrl: "https://awsys.co" });
+    const keyWarnings = warnSpy.mock.calls.filter(([msg]) =>
+      String(msg).includes("does not look like an AWSYS API key"),
+    );
+    expect(keyWarnings).toHaveLength(1);
+  });
+
+  it("a non-https baseUrl emits one warning-level log line", () => {
+    new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "http://example.com" });
+    const urlWarnings = warnSpy.mock.calls.filter(([msg]) => String(msg).includes("http://"));
+    expect(urlWarnings).toHaveLength(1);
+  });
+});
+
+describe("Contract: behaviors — release_tag_matches_version", () => {
+  it("publish.yml asserts the git tag equals v<package.json version> before publishing", () => {
+    const workflow = readFileSync(
+      resolve(__dirname, "../../.github/workflows/publish.yml"),
+      "utf-8",
+    );
+    expect(workflow).toContain("require('./package.json').version");
+    expect(workflow).toContain("$GITHUB_REF_NAME");
+    // The version-check step must run before the publish step, not after.
+    const versionCheckIndex = workflow.indexOf("Verify tag matches package.json version");
+    const publishIndex = workflow.indexOf("npm publish");
+    expect(versionCheckIndex).toBeGreaterThan(-1);
+    expect(versionCheckIndex).toBeLessThan(publishIndex);
   });
 });
