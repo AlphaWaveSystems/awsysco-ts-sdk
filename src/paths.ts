@@ -50,6 +50,15 @@ export const paths = {
   profile: {
     base: "/api/user/profile",
   },
+  customDomains: {
+    base: "/api/user/domains",
+    byDomain: (domain: string): string => `/api/user/domains/${encodeSegment(domain)}`,
+    verify: (domain: string): string =>
+      `/api/user/domains/${encodeSegment(domain)}/verify`,
+    activate: (domain: string): string =>
+      `/api/user/domains/${encodeSegment(domain)}/activate`,
+    check: (hostname: string): string => `/api/domains/check/${encodeSegment(hostname)}`,
+  },
   imports: {
     base: "/api/v1/imports",
     byId: (jobId: string): string => `/api/v1/imports/${encodeSegment(jobId)}`,
