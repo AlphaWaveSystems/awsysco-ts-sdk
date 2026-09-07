@@ -1,0 +1,135 @@
+name: Contract drift check
+
+# Fired by the platform repo (awsys-shortener) on merge to master via
+# repository_dispatch (type api-contract-changed, client_payload:
+# {sha, ref, contractVersion, source}) — see PR #816 there — plus a
+# weekly schedule as a backstop in case a dispatch is ever missed.
+#
+# client_payload fields are attacker-controllable in principle (anyone who
+# can trigger repository_dispatch on this repo controls them), so nothing
+# from it is interpolated directly into a run: shell line — only ever
+# passed through env: and read from the environment.
+on:
+  repository_dispatch:
+    types: [api-contract-changed]
+  schedule:
+    - cron: '0 9 * * 1' # Monday 09:00 UTC
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch latest platform contract
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://raw.githubusercontent.com/AlphaWaveSystems/awsys-shortener/master/contracts/sdk-contract.json" \
+            -o /tmp/latest-sdk-contract.json
+
+      - name: Compare version and run contract-fixture suite against the fetched file
+        id: check
+        env:
+          # From the dispatch payload, if this run came from one — informational only.
+          DISPATCH_CONTRACT_VERSION: ${{ github.event.client_payload.contractVersion }}
+          DISPATCH_SOURCE: ${{ github.event.client_payload.source }}
+        run: |
+          set -euo pipefail
+          VENDORED_VERSION="$(node -p "require('./tests/contracts/sdk-contract.json').version")"
+          LATEST_VERSION="$(node -p "require('/tmp/latest-sdk-contract.json').version")"
+          echo "vendored=$VENDORED_VERSION" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+
+          DRIFT=false
+          if [ "$VENDORED_VERSION" != "$LATEST_VERSION" ]; then
+            DRIFT=true
+            echo "Version mismatch: vendored=$VENDORED_VERSION latest=$LATEST_VERSION"
+          fi
+
+          # Run the contract-fixture suite against the freshly-fetched file,
+          # without touching the vendored copy in the working tree.
+          set +e
+          AWSYS_CONTRACT_FIXTURE_PATH=/tmp/latest-sdk-contract.json npx vitest run tests/contracts/ 2>&1 | tee /tmp/drift-test-output.txt
+          TEST_EXIT=${PIPESTATUS[0]}
+          set -e
+          if [ "$TEST_EXIT" -ne 0 ]; then
+            DRIFT=true
+            echo "Contract-fixture suite failed against the latest platform contract."
+          fi
+
+          echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure sdk-parity label exists
+        if: steps.check.outputs.drift == 'true'
+        run: |
+          set -euo pipefail
+          gh label create sdk-parity --color 5319E7 --description "SDK/platform contract drift — auto-filed" --force
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Open or comment on the drift issue
+        if: steps.check.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_VERSION: ${{ steps.check.outputs.latest }}
+          VENDORED_VERSION: ${{ steps.check.outputs.vendored }}
+        run: |
+          set -euo pipefail
+          TITLE="contract drift: sdk-contract $LATEST_VERSION"
+          BODY_FILE="$(mktemp)"
+          {
+            echo "The platform's \`contracts/sdk-contract.json\` is now at **$LATEST_VERSION**; this repo has **$VENDORED_VERSION** vendored in \`tests/contracts/sdk-contract.json\`, or the contract-fixture suite failed against the fetched copy."
+            echo
+            echo "Triggered by: \`${GITHUB_EVENT_NAME}\`"
+            echo
+            echo "<details><summary>Test output</summary>"
+            echo
+            echo '```'
+            tail -c 20000 /tmp/drift-test-output.txt 2>/dev/null || echo "(no test output captured)"
+            echo '```'
+            echo "</details>"
+          } > "$BODY_FILE"
+
+          EXISTING="$(gh issue list --search "in:title \"$TITLE\"" --state open --json number --jq '.[0].number' || true)"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body-file "$BODY_FILE"
+          else
+            gh issue create --title "$TITLE" --label sdk-parity --body-file "$BODY_FILE"
+          fi
+
+  staging-integration:
+    runs-on: ubuntu-latest
+    # Nightly only — the repository_dispatch trigger above stays focused on
+    # contract drift; this job runs the live suite against staging.
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Staging integration suite
+        # Skips cleanly (not a failure) when AWSYS_API_KEY isn't configured
+        # as a repo secret — see tests/setup.ts. If this key needs
+        # re-provisioning, see docs/STAGING-TEST-ACCOUNTS.md in the
+        # awsys-shortener (platform) repo.
+        env:
+          AWSYS_API_KEY: ${{ secrets.AWSYS_API_KEY }}
+          AWSYS_BASE_URL: ${{ secrets.AWSYS_BASE_URL }}
+        run: npm test

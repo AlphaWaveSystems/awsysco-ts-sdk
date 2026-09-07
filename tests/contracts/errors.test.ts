@@ -16,9 +16,11 @@ import {
 } from "../../src/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const contract = JSON.parse(
-  readFileSync(resolve(__dirname, "sdk-contract.json"), "utf-8"),
-) as {
+// Overridable so CI's contract-drift workflow can run this same suite
+// against a freshly-fetched platform contract without touching the
+// vendored copy in the working tree.
+const contractPath = process.env.AWSYS_CONTRACT_FIXTURE_PATH ?? resolve(__dirname, "sdk-contract.json");
+const contract = JSON.parse(readFileSync(contractPath, "utf-8")) as {
   errors: Array<{
     id: string;
     status: number | null;
