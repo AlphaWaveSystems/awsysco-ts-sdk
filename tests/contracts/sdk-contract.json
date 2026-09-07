@@ -1,6 +1,6 @@
 {
  "$schema": "awsys-sdk-contract/1",
- "version": "1.0.3",
+ "version": "1.0.4",
  "platformBaseline": "2026-09",
  "baseUrl": "https://awsys.co",
  "auth": {
@@ -504,7 +504,8 @@
      "success": true,
      "displayName": "New"
     }
-   }
+   },
+   "note": "body keys are camelCase (user.js:212 reads displayName)"
   },
   {
    "id": "qr_url",
@@ -1756,7 +1757,8 @@
      "threats": []
     }
    },
-   "auth": "none"
+   "auth": "optional",
+   "note": "optionalAuth: send the key or destination is stripped for non-owners (links.js:550+)"
   }
  ],
  "errors": [
