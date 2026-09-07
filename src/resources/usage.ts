@@ -1,6 +1,14 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type { UsageStats } from "../types.js";
+
+function mapUsageStats(raw: UsageStats): UsageStats {
+  return {
+    ...mapTimestampFields(raw, ["apiKeyCreatedAt"]),
+    overage: mapTimestampFields(raw.overage, ["startedAt", "expiresAt"]),
+  };
+}
 
 export class UsageResource {
   constructor(private readonly http: HttpClient) {}
@@ -15,10 +23,13 @@ export class UsageResource {
    * returns the static profile and plan limits — not live consumption.
    *
    * Every field on {@link UsageStats} maps 1:1 by name from the wire
-   * response — no remapping needed (verified live, see contract fixture
-   * 1.0.6's "usage" scenario).
+   * response (verified live, see contract fixture 1.0.6's "usage" scenario)
+   * — the only transformation applied is normalizing `apiKeyCreatedAt` and
+   * `overage.startedAt`/`overage.expiresAt` from Firestore timestamp shapes
+   * to ISO strings, same as every other resource.
    */
   async get(options?: RequestOptions): Promise<UsageStats> {
-    return this.http.get<UsageStats>(paths.usage.stats, undefined, options);
+    const raw = await this.http.get<UsageStats>(paths.usage.stats, undefined, options);
+    return mapUsageStats(raw);
   }
 }

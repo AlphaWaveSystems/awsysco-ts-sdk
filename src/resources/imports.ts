@@ -1,9 +1,14 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type { ImportJob, ImportRedirectMap } from "../types.js";
 
 /** Terminal statuses at which an import job stops progressing. */
 const TERMINAL_STATUSES = ["completed", "partial", "failed", "cancelled"];
+
+function mapImportJob(raw: ImportJob): ImportJob {
+  return mapTimestampFields(raw, ["createdAt", "updatedAt"]);
+}
 
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 120000;
@@ -64,7 +69,8 @@ export class ImportsResource {
     if (opts.scanOnly !== undefined) {
       body.scanOnly = opts.scanOnly;
     }
-    return this.http.post<ImportJob>(paths.imports.base, body, options);
+    const raw = await this.http.post<ImportJob>(paths.imports.base, body, options);
+    return mapImportJob(raw);
   }
 
   /**
@@ -73,7 +79,8 @@ export class ImportsResource {
    * @param jobId - The import job ID
    */
   async getStatus(jobId: string, options?: RequestOptions): Promise<ImportJob> {
-    return this.http.get<ImportJob>(paths.imports.byId(jobId), undefined, options);
+    const raw = await this.http.get<ImportJob>(paths.imports.byId(jobId), undefined, options);
+    return mapImportJob(raw);
   }
 
   /**
@@ -82,7 +89,8 @@ export class ImportsResource {
    * @param jobId - The import job ID
    */
   async cancel(jobId: string, options?: RequestOptions): Promise<ImportJob> {
-    return this.http.delete<ImportJob>(paths.imports.byId(jobId), options);
+    const raw = await this.http.delete<ImportJob>(paths.imports.byId(jobId), options);
+    return mapImportJob(raw);
   }
 
   /**
@@ -99,7 +107,7 @@ export class ImportsResource {
       signal: opts?.signal,
       timeoutMs: opts?.timeoutMs,
     });
-    return response.jobs;
+    return (response.jobs ?? []).map(mapImportJob);
   }
 
   /**

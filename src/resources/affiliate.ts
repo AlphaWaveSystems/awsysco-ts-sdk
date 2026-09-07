@@ -1,11 +1,16 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type {
   AffiliatePartner,
   AffiliatePartnership,
   AffiliateProgram,
   CreateAffiliateProgramOptions,
 } from "../types.js";
+
+function mapAffiliateProgram(raw: AffiliateProgram): AffiliateProgram {
+  return mapTimestampFields(raw, ["createdAt"]);
+}
 
 export class AffiliateResource {
   constructor(private readonly http: HttpClient) {}
@@ -17,7 +22,8 @@ export class AffiliateResource {
     opts: CreateAffiliateProgramOptions,
     options?: RequestOptions,
   ): Promise<AffiliateProgram> {
-    return this.http.post<AffiliateProgram>(paths.affiliate.programs, opts, options);
+    const raw = await this.http.post<AffiliateProgram>(paths.affiliate.programs, opts, options);
+    return mapAffiliateProgram(raw);
   }
 
   /**
@@ -29,18 +35,19 @@ export class AffiliateResource {
       undefined,
       options,
     );
-    return raw.programs;
+    return (raw.programs ?? []).map(mapAffiliateProgram);
   }
 
   /**
    * Get a specific affiliate program by ID.
    */
   async getProgram(programId: string, options?: RequestOptions): Promise<AffiliateProgram> {
-    return this.http.get<AffiliateProgram>(
+    const raw = await this.http.get<AffiliateProgram>(
       paths.affiliate.programById(programId),
       undefined,
       options,
     );
+    return mapAffiliateProgram(raw);
   }
 
   /**
@@ -51,11 +58,12 @@ export class AffiliateResource {
     opts: Partial<CreateAffiliateProgramOptions>,
     options?: RequestOptions,
   ): Promise<AffiliateProgram> {
-    return this.http.patch<AffiliateProgram>(
+    const raw = await this.http.patch<AffiliateProgram>(
       paths.affiliate.programById(programId),
       opts,
       options,
     );
+    return mapAffiliateProgram(raw);
   }
 
   /**

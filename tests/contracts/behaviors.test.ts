@@ -40,14 +40,17 @@ afterEach(() => {
 //   - redaction, user_agent, base_url_override, missing_api_key, iterator_links
 //
 // Added Milestone 3:
-//   - timestamp_variants (src/timestamps.ts's parseTimestamp() — exported
-//     for consumers who want to normalize a raw timestamp field; the SDK
-//     itself does not transform response bodies for any other field either,
-//     so this is opt-in rather than applied automatically. See ADR-017:
+//   - timestamp_variants (src/timestamps.ts's parseTimestamp(); see ADR-017:
 //     returns an ISO string, not a Date, for the 1.x line.)
 //
 // Added post-milestone-3 (PR #10 review fixes, fixture 1.0.5):
 //   - body_read_within_timeout, config_warnings, release_tag_matches_version
+//
+// Added post-merge (fixture 1.0.7, Python-review follow-ups):
+//   - iterator_links_limit_zero, links_list_has_more_from_pagination,
+//     redaction_str (extends redaction: String()/template-literal coercion
+//     of client/errors, plus HttpClient's own redaction), timestamp_never_raises
+//     (extends timestamp_variants with the 4 specific malformed inputs)
 
 describe("Contract: behaviors — auth_header", () => {
   it("sends Authorization: Bearer <key> on every authenticated request", async () => {
@@ -126,6 +129,51 @@ describe("Contract: behaviors — redaction", () => {
     expect(inspect(caught)).not.toContain(RAW_KEY);
     expect(inspect(caught)).not.toContain("bitly_super_secret_token");
   });
+
+  it("String(client)/`${client}` coercion never contains the raw API key", () => {
+    const client = new AwsysClient({ apiKey: RAW_KEY, baseUrl: "https://awsys.co" });
+    // AwsysClient stores only a pre-redacted key (`redactedApiKey`) on
+    // itself and never overrides toString(), so default coercion falls
+    // through to Object.prototype.toString() ("[object Object]") — safe
+    // either way, but assert it explicitly rather than relying on that.
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- asserting the safe default-stringification behavior is the point of this test
+    expect(String(client)).not.toContain(RAW_KEY);
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions -- same as above, for template-literal coercion
+    expect(`${client}`).not.toContain(RAW_KEY);
+  });
+
+  it("String(err)/`${err}` coercion never contains the raw API key", async () => {
+    const client = new AwsysClient({ apiKey: RAW_KEY, baseUrl: "https://awsys.co" });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(401, { error: true, code: "UNAUTHORIZED", message: "invalid key" }),
+    );
+    const err = await client.links.get("abc123").catch((e) => e);
+    // Error.prototype.toString() (name + message) is used — never
+    // overridden to include `raw`/the key.
+    expect(String(err)).not.toContain(RAW_KEY);
+    expect(`${err}`).not.toContain(RAW_KEY);
+  });
+
+  it("every resource's underlying HttpClient also redacts (not just the top-level client)", () => {
+    // Every resource (client.links, client.webhooks, ...) holds its own
+    // reference to the shared HttpClient. TS `private` is erased at
+    // runtime, so without HttpClient's own toJSON/[inspect.custom],
+    // `util.inspect(client.links)` would print the raw key in plaintext.
+    const client = new AwsysClient({ apiKey: RAW_KEY, baseUrl: "https://awsys.co" });
+    expect(JSON.stringify(client.links)).not.toContain(RAW_KEY);
+    expect(inspect(client.links)).not.toContain(RAW_KEY);
+    expect(inspect(client.webhooks)).not.toContain(RAW_KEY);
+  });
+
+  // Note on the fixture's "models carrying secrets (Webhook.secret)" clause:
+  // in TS, `Webhook` is a plain response-data interface, not a class the
+  // SDK constructs — there's no coercion hook to attach redaction to, and
+  // stripping `secret` from data the user's own API key legitimately
+  // fetched would break its only purpose (configuring their receiver). We
+  // instead guarantee the SDK's OWN code never logs a webhook: confirmed by
+  // grepping `src/` for `console.*` — the only call sites are the two
+  // config warnings above and the customDomains.activate deprecation
+  // warning, none of which touch webhook data.
 });
 
 describe("Contract: behaviors — user_agent", () => {
@@ -226,6 +274,75 @@ describe("Contract: behaviors — iterator_links", () => {
   });
 });
 
+describe("Contract: behaviors — iterator_links_limit_zero", () => {
+  it("limit: 0 clamps to 1 and terminates instead of looping forever", async () => {
+    const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        links: [{ id: "abc123", shortCode: "abc123" }],
+        pagination: { limit: 1, offset: 0, hasMore: false },
+      }),
+    );
+
+    const collected: unknown[] = [];
+    for await (const link of client.links.listAll({ limit: 0 })) {
+      collected.push(link);
+    }
+
+    expect(collected).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestedUrl = new URL(fetchMock.mock.calls[0][0]);
+    expect(requestedUrl.searchParams.get("limit")).toBe("1");
+  });
+
+  it("a negative limit clamps to 1 and terminates instead of looping forever", async () => {
+    const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        links: [],
+        pagination: { limit: 1, offset: 0, hasMore: false },
+      }),
+    );
+
+    const collected: unknown[] = [];
+    for await (const link of client.links.listAll({ limit: -5 })) {
+      collected.push(link);
+    }
+
+    expect(collected).toHaveLength(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Contract: behaviors — links_list_has_more_from_pagination", () => {
+  it("list()'s hasMore is read from pagination.hasMore, not a top-level key", async () => {
+    const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
+
+    fetchMock.mockResolvedValueOnce(
+      // A top-level `hasMore: false` that contradicts the real signal in
+      // `pagination.hasMore` — if the SDK ever regresses to reading a
+      // top-level key, this would flip the assertion below.
+      jsonResponse(200, {
+        links: [{ id: "abc123", shortCode: "abc123" }],
+        hasMore: false,
+        pagination: { limit: 20, offset: 0, hasMore: true },
+      }),
+    );
+    const page1 = await client.links.list();
+    expect(page1.hasMore).toBe(true);
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        links: [],
+        hasMore: true,
+        pagination: { limit: 20, offset: 20, hasMore: false },
+      }),
+    );
+    const page2 = await client.links.list({ offset: 20 });
+    expect(page2.hasMore).toBe(false);
+  });
+});
+
 describe("Contract: behaviors — timestamp_variants", () => {
   it("passes through a plain ISO string unchanged", () => {
     expect(parseTimestamp("2026-09-01T00:00:00.000Z")).toBe("2026-09-01T00:00:00.000Z");
@@ -247,6 +364,86 @@ describe("Contract: behaviors — timestamp_variants", () => {
     expect(parseTimestamp(null)).toBe(null);
     expect(parseTimestamp(undefined)).toBe(undefined);
     expect(parseTimestamp(42)).toBe(42);
+  });
+
+  it("timestamp_never_raises: never throws for malformed/out-of-range shapes", () => {
+    // Non-numeric nanoseconds — fails the typeof check, falls through raw.
+    const nonNumericNanos = { seconds: 1, nanoseconds: "q" };
+    expect(() => parseTimestamp(nonNumericNanos)).not.toThrow();
+    expect(parseTimestamp(nonNumericNanos)).toBe(nonNumericNanos);
+
+    // Absurdly large seconds — produces a ms value outside Date's valid
+    // range; new Date(...).toISOString() would throw RangeError without
+    // the finite/valid-date guard.
+    const hugeSeconds = { _seconds: 1e300 };
+    expect(() => parseTimestamp(hugeSeconds)).not.toThrow();
+    expect(parseTimestamp(hugeSeconds)).toBe(hugeSeconds);
+
+    // Absurdly negative seconds — same out-of-range failure mode.
+    const hugeNegativeSeconds = { seconds: -1e14 };
+    expect(() => parseTimestamp(hugeNegativeSeconds)).not.toThrow();
+    expect(parseTimestamp(hugeNegativeSeconds)).toBe(hugeNegativeSeconds);
+
+    // Array instead of a number — fails the typeof check, falls through raw.
+    const arraySeconds = { seconds: [1] };
+    expect(() => parseTimestamp(arraySeconds)).not.toThrow();
+    expect(parseTimestamp(arraySeconds)).toBe(arraySeconds);
+  });
+});
+
+describe("Contract: behaviors — timestamp_variants (wired into response parsing)", () => {
+  it("normalizes a Firestore-shaped `created` field on a real Link response to an ISO string", async () => {
+    const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
+    const firestoreCreated = { _seconds: 1756684800, _nanoseconds: 0 };
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        id: "doc123",
+        short: "abc123",
+        shortCode: "abc123",
+        fullPath: "abc123",
+        long: "https://example.com/",
+        clicks: 0,
+        created: firestoreCreated,
+        expiresAt: null,
+        maxClicks: null,
+        isCustom: false,
+      }),
+    );
+
+    const link = await client.links.get("abc123");
+
+    expect(link.created).toBe(new Date(1756684800 * 1000).toISOString());
+    expect(typeof link.created).toBe("string");
+  });
+
+  it("normalizes Firestore-shaped timestamps on links.list() results too", async () => {
+    const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
+    const firestoreExpiresAt = { seconds: 1756684800, nanoseconds: 0 };
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        links: [
+          {
+            id: "doc123",
+            short: "abc123",
+            shortCode: "abc123",
+            fullPath: "abc123",
+            long: "https://example.com/",
+            clicks: 0,
+            created: null,
+            expiresAt: firestoreExpiresAt,
+            maxClicks: null,
+            isCustom: false,
+          },
+        ],
+        pagination: { limit: 20, offset: 0, hasMore: false },
+      }),
+    );
+
+    const page = await client.links.list();
+
+    expect(page.data[0]?.expiresAt).toBe(new Date(1756684800 * 1000).toISOString());
   });
 });
 

@@ -1,10 +1,15 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type { CreateFolderOptions, Folder, UpdateFolderOptions } from "../types.js";
 
 interface RawFoldersResponse {
   folders?: Folder[];
   data?: Folder[];
+}
+
+function mapFolder(raw: Folder): Folder {
+  return mapTimestampFields(raw, ["createdAt"]);
 }
 
 export class FoldersResource {
@@ -19,14 +24,15 @@ export class FoldersResource {
       undefined,
       options,
     );
-    return raw.folders ?? raw.data ?? [];
+    return (raw.folders ?? raw.data ?? []).map(mapFolder);
   }
 
   /**
    * Create a new folder.
    */
   async create(opts: CreateFolderOptions, options?: RequestOptions): Promise<Folder> {
-    return this.http.post<Folder>(paths.folders.base, opts, options);
+    const raw = await this.http.post<Folder>(paths.folders.base, opts, options);
+    return mapFolder(raw);
   }
 
   /**
@@ -40,7 +46,12 @@ export class FoldersResource {
     opts: UpdateFolderOptions,
     options?: RequestOptions,
   ): Promise<Folder> {
-    return this.http.patch<Folder>(paths.folders.byIdForUpdate(folderId), opts, options);
+    const raw = await this.http.patch<Folder>(
+      paths.folders.byIdForUpdate(folderId),
+      opts,
+      options,
+    );
+    return mapFolder(raw);
   }
 
   /**

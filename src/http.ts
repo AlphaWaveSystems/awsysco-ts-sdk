@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import {
   AwsysAuthError,
   AwsysConflictError,
@@ -163,6 +164,26 @@ export class HttpClient {
     this.baseUrl = baseUrl;
     this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
     this.defaultTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  }
+
+  private redactedApiKey(): string {
+    return this.apiKey.length > 4
+      ? `${this.apiKey.slice(0, 6)}...${this.apiKey.slice(-4)}`
+      : "awsys_...";
+  }
+
+  /**
+   * Redacted representation — every resource class holds a reference to
+   * this `HttpClient`, so `JSON.stringify(client.links)` etc. must not
+   * expose the raw key either (TS `private` is erased at runtime; only
+   * these overrides actually keep it out of default serialization).
+   */
+  toJSON(): { baseUrl: string; apiKey: string } {
+    return { baseUrl: this.baseUrl, apiKey: this.redactedApiKey() };
+  }
+
+  [inspect.custom](): string {
+    return `HttpClient ${inspect(this.toJSON())}`;
   }
 
   private buildHeaders(): Record<string, string> {

@@ -1,5 +1,6 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type {
   CreateLinkOptions,
   CreatedLink,
@@ -10,6 +11,14 @@ import type {
 } from "../types.js";
 
 const MAX_LIST_LIMIT = 100;
+
+function mapLink(raw: Link): Link {
+  return mapTimestampFields(raw, ["created", "expiresAt"]);
+}
+
+function mapCreatedLink(raw: CreatedLink): CreatedLink {
+  return mapTimestampFields(raw, ["expiresAt"]);
+}
 
 interface RawListResponse {
   links?: Link[];
@@ -34,7 +43,8 @@ export class LinksResource {
     opts: CreateLinkOptions,
     options?: RequestOptions,
   ): Promise<CreatedLink> {
-    return this.http.post<CreatedLink>(paths.links.base, opts, options);
+    const raw = await this.http.post<CreatedLink>(paths.links.base, opts, options);
+    return mapCreatedLink(raw);
   }
 
   /**
@@ -47,7 +57,9 @@ export class LinksResource {
     opts?: ListLinksOptions & RequestOptions,
   ): Promise<PaginatedResponse<Link>> {
     const limit =
-      opts?.limit !== undefined ? Math.min(opts.limit, MAX_LIST_LIMIT) : undefined;
+      opts?.limit !== undefined
+        ? Math.max(1, Math.min(opts.limit, MAX_LIST_LIMIT))
+        : undefined;
     const offset = opts?.offset;
 
     const params: Record<string, string | number> = {};
@@ -59,7 +71,7 @@ export class LinksResource {
       timeoutMs: opts?.timeoutMs,
     });
 
-    const data = raw.links ?? raw.data ?? [];
+    const data = (raw.links ?? raw.data ?? []).map(mapLink);
     return {
       data,
       limit: raw.pagination?.limit ?? limit ?? data.length,
@@ -85,7 +97,9 @@ export class LinksResource {
     opts?: ListLinksOptions & RequestOptions,
   ): AsyncGenerator<Link, void, void> {
     const limit =
-      opts?.limit !== undefined ? Math.min(opts.limit, MAX_LIST_LIMIT) : MAX_LIST_LIMIT;
+      opts?.limit !== undefined
+        ? Math.max(1, Math.min(opts.limit, MAX_LIST_LIMIT))
+        : MAX_LIST_LIMIT;
     let offset = opts?.offset ?? 0;
 
     while (true) {
@@ -114,7 +128,8 @@ export class LinksResource {
     shortPath: string,
     options?: RequestOptions,
   ): Promise<Link> {
-    return this.http.get<Link>(paths.links.byShortPath(shortPath), undefined, options);
+    const raw = await this.http.get<Link>(paths.links.byShortPath(shortPath), undefined, options);
+    return mapLink(raw);
   }
 
   /**
@@ -128,7 +143,12 @@ export class LinksResource {
     opts: UpdateLinkOptions,
     options?: RequestOptions,
   ): Promise<Link> {
-    return this.http.patch<Link>(paths.links.byShortPathForUpdate(shortPath), opts, options);
+    const raw = await this.http.patch<Link>(
+      paths.links.byShortPathForUpdate(shortPath),
+      opts,
+      options,
+    );
+    return mapLink(raw);
   }
 
   /**

@@ -1,11 +1,26 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type {
   AggregateAnalytics,
   GetRecentClicksOptions,
   LinkStats,
   RecentClicksResult,
 } from "../types.js";
+
+function mapLinkStats(raw: LinkStats): LinkStats {
+  return {
+    ...raw,
+    clicks: (raw.clicks ?? []).map((click) => mapTimestampFields(click, ["timestamp"])),
+  };
+}
+
+function mapRecentClicksResult(raw: RecentClicksResult): RecentClicksResult {
+  return {
+    ...raw,
+    clicks: (raw.clicks ?? []).map((click) => mapTimestampFields(click, ["timestamp"])),
+  };
+}
 
 export class AnalyticsResource {
   constructor(private readonly http: HttpClient) {}
@@ -24,7 +39,8 @@ export class AnalyticsResource {
   ): Promise<LinkStats> {
     const params: Record<string, string | number> = {};
     if (period !== undefined) params.period = period;
-    return this.http.get<LinkStats>(paths.links.stats(shortPath), params, options);
+    const raw = await this.http.get<LinkStats>(paths.links.stats(shortPath), params, options);
+    return mapLinkStats(raw);
   }
 
   /**
@@ -72,6 +88,11 @@ export class AnalyticsResource {
     const params: Record<string, string | number> = {};
     if (opts.limit !== undefined) params.limit = opts.limit;
     if (opts.since !== undefined) params.since = opts.since;
-    return this.http.get<RecentClicksResult>(paths.analytics.recentClicks, params, options);
+    const raw = await this.http.get<RecentClicksResult>(
+      paths.analytics.recentClicks,
+      params,
+      options,
+    );
+    return mapRecentClicksResult(raw);
   }
 }

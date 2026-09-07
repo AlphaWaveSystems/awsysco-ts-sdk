@@ -1,5 +1,6 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { parseTimestamp } from "../timestamps.js";
 import type { TrustScoreResult } from "../types.js";
 
 interface RawTrustScoreResult {
@@ -18,6 +19,7 @@ function mapTrustScoreResult(raw: RawTrustScoreResult): TrustScoreResult {
     short: raw.shortCode,
     score: raw.trustScore,
     status: raw.trustStatus,
+    scannedAt: parseTimestamp(raw.scannedAt) as string | null | undefined,
   };
 }
 
