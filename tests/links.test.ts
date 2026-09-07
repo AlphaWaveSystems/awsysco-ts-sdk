@@ -17,11 +17,11 @@ function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
 }
 
 const client = new AwsysClient({
-  apiKey: process.env.AWSYS_API_KEY!,
+  apiKey: process.env.AWSYS_API_KEY ?? "awsys_test_placeholder",
   baseUrl: process.env.AWSYS_BASE_URL ?? "https://staging.awsys.co",
 });
 
-describe("Links", () => {
+describe.skipIf(!process.env.AWSYS_API_KEY)("Links", () => {
   let createdShortCode: string;
   let setupSkip = false;
 
@@ -94,7 +94,8 @@ describe("Links", () => {
       const result = await client.links.list({ limit: 5 });
 
       expect(Array.isArray(result.data)).toBe(true);
-      expect(typeof result.total).toBe("number");
+      expect(typeof result.limit).toBe("number");
+      expect(typeof result.offset).toBe("number");
       expect(typeof result.hasMore).toBe("boolean");
     });
 

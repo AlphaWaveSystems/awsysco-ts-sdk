@@ -1,5 +1,6 @@
 import type { HttpClient } from "../http.js";
-import type { ImportJob } from "../types.js";
+import { paths } from "../paths.js";
+import type { ImportJob, ImportRedirectMap } from "../types.js";
 
 /** Terminal statuses at which an import job stops progressing. */
 const TERMINAL_STATUSES = ["completed", "partial", "failed", "cancelled"];
@@ -49,15 +50,15 @@ export class ImportsResource {
   async start(opts: StartImportOptions): Promise<ImportJob> {
     const body: Record<string, unknown> = {
       provider: opts.provider,
-      access_token: opts.accessToken,
+      accessToken: opts.accessToken,
     };
     if (opts.targetNamespace !== undefined) {
-      body.target_namespace = opts.targetNamespace;
+      body.targetNamespace = opts.targetNamespace;
     }
     if (opts.scanOnly !== undefined) {
-      body.scan_only = opts.scanOnly;
+      body.scanOnly = opts.scanOnly;
     }
-    return this.http.post<ImportJob>("/api/v1/imports", body);
+    return this.http.post<ImportJob>(paths.imports.base, body);
   }
 
   /**
@@ -66,9 +67,7 @@ export class ImportsResource {
    * @param jobId - The import job ID
    */
   async getStatus(jobId: string): Promise<ImportJob> {
-    return this.http.get<ImportJob>(
-      `/api/v1/imports/${encodeURIComponent(jobId)}`,
-    );
+    return this.http.get<ImportJob>(paths.imports.byId(jobId));
   }
 
   /**
@@ -77,9 +76,7 @@ export class ImportsResource {
    * @param jobId - The import job ID
    */
   async cancel(jobId: string): Promise<ImportJob> {
-    return this.http.delete<ImportJob>(
-      `/api/v1/imports/${encodeURIComponent(jobId)}`,
-    );
+    return this.http.delete<ImportJob>(paths.imports.byId(jobId));
   }
 
   /**
@@ -91,10 +88,29 @@ export class ImportsResource {
     const params: Record<string, string | number> = {};
     if (opts?.limit !== undefined) params.limit = opts.limit;
     const response = await this.http.get<{ jobs: ImportJob[] }>(
-      "/api/v1/imports",
+      paths.imports.base,
       params,
     );
     return response.jobs;
+  }
+
+  /**
+   * Download the redirect map for a completed import as raw CSV text
+   * (`old_url,new_url` rows).
+   *
+   * @param jobId - The import job ID
+   */
+  async getRedirectMapCsv(jobId: string): Promise<string> {
+    return this.http.getText(paths.imports.redirectMapCsv(jobId));
+  }
+
+  /**
+   * Download the redirect map for a completed import as structured JSON.
+   *
+   * @param jobId - The import job ID
+   */
+  async getRedirectMapJson(jobId: string): Promise<ImportRedirectMap> {
+    return this.http.get<ImportRedirectMap>(paths.imports.redirectMapJson(jobId));
   }
 
   /**

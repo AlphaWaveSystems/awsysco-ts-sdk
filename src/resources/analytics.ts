@@ -1,5 +1,11 @@
 import type { HttpClient } from "../http.js";
-import type { AggregateAnalytics, ClickEvent, LinkStats } from "../types.js";
+import { paths } from "../paths.js";
+import type {
+  AggregateAnalytics,
+  GetRecentClicksOptions,
+  LinkStats,
+  RecentClicksResult,
+} from "../types.js";
 
 export class AnalyticsResource {
   constructor(private readonly http: HttpClient) {}
@@ -14,10 +20,7 @@ export class AnalyticsResource {
   async getStats(shortPath: string, period?: string): Promise<LinkStats> {
     const params: Record<string, string | number> = {};
     if (period !== undefined) params.period = period;
-    return this.http.get<LinkStats>(
-      `/api/v1/links/${encodeURIComponent(shortPath)}/stats`,
-      params,
-    );
+    return this.http.get<LinkStats>(paths.links.stats(shortPath), params);
   }
 
   /**
@@ -38,7 +41,7 @@ export class AnalyticsResource {
     const params: Record<string, string | number> = {};
     if (opts?.period !== undefined) params.period = opts.period;
     return this.http.get<AggregateAnalytics>(
-      `/api/v1/links/${encodeURIComponent(shortPath)}/stats/aggregate`,
+      paths.links.aggregateStats(shortPath),
       params,
     );
   }
@@ -46,11 +49,16 @@ export class AnalyticsResource {
   /**
    * Get the most recent clicks across all links for the authenticated user.
    *
-   * @param limit - Maximum number of recent click events to return
+   * Requires the "Live Globe" feature flag to be enabled on the account —
+   * throws {@link AwsysForbiddenError} with `code: "FEATURE_DISABLED"` otherwise.
+   *
+   * @param opts.limit - Maximum number of recent click events to return
+   * @param opts.since - ISO 8601 timestamp; only return clicks after this time
    */
-  async getRecentClicks(limit?: number): Promise<ClickEvent[]> {
+  async getRecentClicks(opts?: GetRecentClicksOptions): Promise<RecentClicksResult> {
     const params: Record<string, string | number> = {};
-    if (limit !== undefined) params.limit = limit;
-    return this.http.get<ClickEvent[]>("/api/user/recent-clicks", params);
+    if (opts?.limit !== undefined) params.limit = opts.limit;
+    if (opts?.since !== undefined) params.since = opts.since;
+    return this.http.get<RecentClicksResult>(paths.analytics.recentClicks, params);
   }
 }
