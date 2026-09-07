@@ -252,6 +252,15 @@ describe("Contract: error mapping (no retry involved)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("err_503_retry_after_oversized → AwsysServerError raised immediately, Retry-After above the cap is never slept on the 5xx path either", async () => {
+    const s = scenario("err_503_retry_after_oversized");
+    fetchMock.mockResolvedValueOnce(jsonOrTextResponse(s.status!, s.body, s.headers));
+    const err = await client.links.get("abc123").catch((e) => e);
+    expect(err).toBeInstanceOf(AwsysServerError);
+    expect(err.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("err_network → AwsysNetworkError on POST (non-idempotent, no retry)", async () => {
     scenario("err_network");
     fetchMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
