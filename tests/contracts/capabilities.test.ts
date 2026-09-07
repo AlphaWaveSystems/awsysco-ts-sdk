@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { AwsysClient } from "../../src/index.js";
+import { AwsysForbiddenError } from "../../src/errors.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const contract = JSON.parse(
@@ -57,9 +58,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * Every scenario ID exercised by a test in this file, populated as tests
+ * run. Checked at the end (see "Contract: coverage" below) against the full
+ * fixture so an un-mapped capability fails loudly instead of being silently
+ * absent from the suite.
+ */
+const coveredIds = new Set<string>();
+
+/** Marks a scenario as covered without mocking fetch (e.g. for a scenario the SDK deliberately never calls). */
+function markCovered(id: string): ReturnType<typeof scenario> {
+  coveredIds.add(id);
+  return scenario(id);
+}
+
 /** Queues the scenario's documented response as the next fetch() resolution. */
 function mockScenario(id: string, isText = false) {
-  const s = scenario(id);
+  const s = markCovered(id);
   fetchMock.mockResolvedValueOnce(
     isText
       ? textResponse(s.response.status, s.response.body as string)
@@ -302,9 +317,48 @@ describe("Contract: capabilities — imports", () => {
   });
 });
 
+describe("Contract: capabilities — customDomains (deprecated activate)", () => {
+  it("domain_activate_deprecated: SDK must not call, raises AuthorizationError-equivalent", async () => {
+    const s = markCovered("domain_activate_deprecated");
+    expect(s.expect_error).toBe("AuthorizationError");
+
+    await expect(client.customDomains.activate("go.example.com")).rejects.toBeInstanceOf(
+      AwsysForbiddenError,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Contract: capabilities — analytics (legacy call style)", () => {
+  it("recent_clicks accepts the old positional limit argument (ADR-014 compat)", async () => {
+    const s = mockScenario("recent_clicks");
+    const result = await client.analytics.getRecentClicks(10);
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
 // Not yet covered this milestone (out of scope — resources untouched by
-// Milestone 1): tags, qr, customDomains, savedViews, utmTemplates, webhooks,
-// affiliate, agentlink, namespace, dataExport, trustScore, bulk, usage, me,
-// web2app. Their capability scenarios in the fixture are left for a later
-// pass once those resources are routed through src/paths.ts / covered by
-// this milestone's error+retry rewrite.
+// Milestone 1/2): tags, qr, customDomains (all but the deprecated activate()
+// above), savedViews, utmTemplates, webhooks, affiliate, agentlink,
+// namespace, dataExport, trustScore, bulk, usage, me, web2app. Their
+// capability scenarios are left for Milestone 3 once those resources are
+// routed through src/paths.ts. The "Contract: coverage" test below fails
+// loudly listing exactly which scenario IDs remain, per Gate 3.
+describe("Contract: coverage", () => {
+  it("every capability scenario is exercised by a test in this file (Gate 3)", () => {
+    // Depends on every `it` above having already run and populated
+    // `coveredIds` — this must stay the last test in the file.
+    const missing = contract.capabilities
+      .map((c) => c.id)
+      .filter((id) => !coveredIds.has(id));
+
+    if (missing.length > 0) {
+      throw new Error(
+        `${missing.length}/${contract.capabilities.length} capability scenario(s) not yet mapped to an SDK call ` +
+          `(Milestone 3 scope — see the comment above this test):\n` +
+          missing.map((id) => `  - ${id}`).join("\n"),
+      );
+    }
+  });
+});
