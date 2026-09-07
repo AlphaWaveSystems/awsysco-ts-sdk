@@ -21,7 +21,17 @@ export function parseTimestamp(value: unknown): unknown {
     const seconds = obj._seconds ?? obj.seconds;
     const nanoseconds = obj._nanoseconds ?? obj.nanoseconds ?? 0;
     if (typeof seconds === "number" && typeof nanoseconds === "number") {
-      return new Date(seconds * 1000 + Math.floor(nanoseconds / 1_000_000)).toISOString();
+      const ms = seconds * 1000 + Math.floor(nanoseconds / 1_000_000);
+      // `Date`'s valid range is roughly ±8.64e15ms from the epoch — a
+      // corrupt/absurd `seconds` value (e.g. 1e300, or -1e14) produces an
+      // Invalid Date whose `toISOString()` throws. Fall back to the raw
+      // value rather than let one bad timestamp break the whole call.
+      if (Number.isFinite(ms)) {
+        const date = new Date(ms);
+        if (!Number.isNaN(date.getTime())) {
+          return date.toISOString();
+        }
+      }
     }
   }
 

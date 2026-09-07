@@ -47,7 +47,9 @@ export class LinksResource {
     opts?: ListLinksOptions & RequestOptions,
   ): Promise<PaginatedResponse<Link>> {
     const limit =
-      opts?.limit !== undefined ? Math.min(opts.limit, MAX_LIST_LIMIT) : undefined;
+      opts?.limit !== undefined
+        ? Math.max(1, Math.min(opts.limit, MAX_LIST_LIMIT))
+        : undefined;
     const offset = opts?.offset;
 
     const params: Record<string, string | number> = {};
@@ -85,7 +87,9 @@ export class LinksResource {
     opts?: ListLinksOptions & RequestOptions,
   ): AsyncGenerator<Link, void, void> {
     const limit =
-      opts?.limit !== undefined ? Math.min(opts.limit, MAX_LIST_LIMIT) : MAX_LIST_LIMIT;
+      opts?.limit !== undefined
+        ? Math.max(1, Math.min(opts.limit, MAX_LIST_LIMIT))
+        : MAX_LIST_LIMIT;
     let offset = opts?.offset ?? 0;
 
     while (true) {
