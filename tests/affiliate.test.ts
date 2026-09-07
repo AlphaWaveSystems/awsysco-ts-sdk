@@ -59,8 +59,8 @@ describe("AffiliateResource", () => {
   });
 
   describe("listPrograms", () => {
-    it("calls GET /api/affiliate/programs and returns array", async () => {
-      vi.mocked(http.get).mockResolvedValue([sampleProgram]);
+    it("calls GET /api/affiliate/programs and unwraps the {programs:[]} envelope", async () => {
+      vi.mocked(http.get).mockResolvedValue({ programs: [sampleProgram] });
 
       const result = await affiliate.listPrograms();
 
@@ -119,11 +119,11 @@ describe("AffiliateResource", () => {
   });
 
   describe("listPartners", () => {
-    it("calls GET /api/affiliate/programs/:id/partners", async () => {
+    it("calls GET /api/affiliate/programs/:id/partners and unwraps the {partners:[]} envelope", async () => {
       const partners = [
         { id: "p1", partnerId: "user1", status: "approved", partnerCode: "REF1" },
       ];
-      vi.mocked(http.get).mockResolvedValue(partners);
+      vi.mocked(http.get).mockResolvedValue({ partners });
 
       const result = await affiliate.listPartners("prog1");
 
@@ -150,8 +150,8 @@ describe("AffiliateResource", () => {
   });
 
   describe("discover", () => {
-    it("calls GET /api/affiliate/discover", async () => {
-      vi.mocked(http.get).mockResolvedValue([sampleProgram]);
+    it("calls GET /api/affiliate/discover and unwraps the {programs:[]} envelope", async () => {
+      vi.mocked(http.get).mockResolvedValue({ programs: [sampleProgram] });
 
       const result = await affiliate.discover();
 
@@ -160,7 +160,7 @@ describe("AffiliateResource", () => {
     });
 
     it("passes limit when provided", async () => {
-      vi.mocked(http.get).mockResolvedValue([]);
+      vi.mocked(http.get).mockResolvedValue({ programs: [] });
 
       await affiliate.discover(10);
 
@@ -190,8 +190,8 @@ describe("AffiliateResource", () => {
   });
 
   describe("listPartnerships", () => {
-    it("calls GET /api/affiliate/partnerships", async () => {
-      vi.mocked(http.get).mockResolvedValue([samplePartnership]);
+    it("calls GET /api/affiliate/partnerships and unwraps the {partnerships:[]} envelope", async () => {
+      vi.mocked(http.get).mockResolvedValue({ partnerships: [samplePartnership] });
 
       const result = await affiliate.listPartnerships();
 

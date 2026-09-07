@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { AwsysForbiddenError } from "../src/errors.js";
 import { CustomDomainsResource } from "../src/resources/customDomains.js";
 import type { HttpClient } from "../src/http.js";
 
@@ -76,16 +77,35 @@ describe("CustomDomainsResource", () => {
     });
   });
 
-  describe("activate", () => {
-    it("calls POST /api/user/domains/:domain/activate", async () => {
-      vi.mocked(http.post).mockResolvedValue(sampleDomain);
-
-      const result = await customDomains.activate("links.example.com");
-
-      expect(http.post).toHaveBeenCalledWith(
-        "/api/user/domains/links.example.com/activate",
+  describe("activate (deprecated — ADR-006)", () => {
+    it("throws AwsysForbiddenError without making a network call", async () => {
+      await expect(customDomains.activate("links.example.com")).rejects.toBeInstanceOf(
+        AwsysForbiddenError,
       );
-      expect(result.status).toBe("active");
+      expect(http.post).not.toHaveBeenCalled();
+    });
+
+    it("throws with a FIREBASE_AUTH_REQUIRED code and guidance message", async () => {
+      await expect(customDomains.activate("links.example.com")).rejects.toMatchObject({
+        code: "FIREBASE_AUTH_REQUIRED",
+        message: expect.stringContaining("dashboard"),
+      });
+    });
+
+    it("warns via console.warn only once per process", async () => {
+      // The "warned" flag is module-level state, so re-import a fresh copy
+      // of the module rather than relying on suite ordering against the
+      // `customDomains` instance other tests in this file already called.
+      vi.resetModules();
+      const fresh = await import("../src/resources/customDomains.js");
+      const freshDomains = new fresh.CustomDomainsResource(mockHttp());
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await freshDomains.activate("a.example.com").catch(() => {});
+      await freshDomains.activate("b.example.com").catch(() => {});
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      warnSpy.mockRestore();
     });
   });
 

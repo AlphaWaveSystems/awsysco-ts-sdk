@@ -1,4 +1,5 @@
 import type { HttpClient } from "../http.js";
+import { paths } from "../paths.js";
 import type { CreateFolderOptions, Folder, UpdateFolderOptions } from "../types.js";
 
 interface RawFoldersResponse {
@@ -13,15 +14,15 @@ export class FoldersResource {
    * List all folders for the authenticated user.
    */
   async list(): Promise<Folder[]> {
-    const raw = await this.http.get<RawFoldersResponse>("/api/v1/folders");
-    return raw.folders ?? raw.data ?? (raw as unknown as Folder[]);
+    const raw = await this.http.get<RawFoldersResponse>(paths.folders.base);
+    return raw.folders ?? raw.data ?? [];
   }
 
   /**
    * Create a new folder.
    */
   async create(opts: CreateFolderOptions): Promise<Folder> {
-    return this.http.post<Folder>("/api/v1/folders", opts);
+    return this.http.post<Folder>(paths.folders.base, opts);
   }
 
   /**
@@ -31,38 +32,27 @@ export class FoldersResource {
    * @param opts - Fields to update
    */
   async update(folderId: string, opts: UpdateFolderOptions): Promise<Folder> {
-    return this.http.patch<Folder>(
-      `/api/v1/folders/${encodeURIComponent(folderId)}`,
-      opts,
-    );
+    return this.http.patch<Folder>(paths.folders.byIdForUpdate(folderId), opts);
   }
 
   /**
    * Delete a folder by ID.
    */
   async delete(folderId: string): Promise<void> {
-    return this.http.delete<void>(
-      `/api/v1/folders/${encodeURIComponent(folderId)}`,
-    );
+    return this.http.delete<void>(paths.folders.byId(folderId));
   }
 
   /**
    * Assign a link to a folder.
    */
   async assignLink(shortPath: string, folderId: string): Promise<void> {
-    return this.http.post<void>(
-      `/api/v1/links/${encodeURIComponent(shortPath)}/folder`,
-      { folderId },
-    );
+    return this.http.post<void>(paths.links.folder(shortPath), { folderId });
   }
 
   /**
    * Remove a link from its current folder.
    */
   async removeLink(shortPath: string): Promise<void> {
-    return this.http.post<void>(
-      `/api/v1/links/${encodeURIComponent(shortPath)}/folder`,
-      { folderId: null },
-    );
+    return this.http.post<void>(paths.links.folder(shortPath), { folderId: null });
   }
 }

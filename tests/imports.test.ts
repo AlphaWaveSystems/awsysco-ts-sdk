@@ -43,7 +43,10 @@ describe("ImportsResource", () => {
   });
 
   describe("start", () => {
-    it("POSTs a snake_case body to /api/v1/imports and parses the job", async () => {
+    it("POSTs a camelCase body to /api/v1/imports and parses the job", async () => {
+      // The platform expects camelCase body keys (matches the contract
+      // fixture's `import_start` scenario) — the SDK previously sent
+      // snake_case, which the platform silently ignored.
       const expected = makeJob({ status: "queued" });
       vi.mocked(http.post).mockResolvedValue(expected);
 
@@ -56,9 +59,9 @@ describe("ImportsResource", () => {
 
       expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
         provider: "bitly",
-        access_token: "tok_secret",
-        target_namespace: "acme",
-        scan_only: true,
+        accessToken: "tok_secret",
+        targetNamespace: "acme",
+        scanOnly: true,
       });
       expect(result).toEqual(expected);
     });
@@ -70,11 +73,11 @@ describe("ImportsResource", () => {
 
       expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
         provider: "bitly",
-        access_token: "tok",
+        accessToken: "tok",
       });
     });
 
-    it("forwards scan_only: false explicitly when set", async () => {
+    it("forwards scanOnly: false explicitly when set", async () => {
       vi.mocked(http.post).mockResolvedValue(makeJob());
 
       await imports.start({
@@ -85,8 +88,8 @@ describe("ImportsResource", () => {
 
       expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
         provider: "bitly",
-        access_token: "tok",
-        scan_only: false,
+        accessToken: "tok",
+        scanOnly: false,
       });
     });
   });
@@ -183,6 +186,36 @@ describe("ImportsResource", () => {
           timeoutMs: 5,
         }),
       ).rejects.toThrow(/did not reach a terminal status within 5ms/);
+    });
+  });
+
+  describe("getRedirectMapCsv", () => {
+    it("GETs the CSV redirect map as raw text", async () => {
+      const csv = "old_url,new_url\nhttps://bit.ly/x,https://awsys.co/x\n";
+      vi.mocked(http.getText).mockResolvedValue(csv);
+
+      const result = await imports.getRedirectMapCsv("imp_123");
+
+      expect(http.getText).toHaveBeenCalledWith(
+        "/api/v1/imports/imp_123/redirect-map.csv",
+      );
+      expect(result).toBe(csv);
+    });
+  });
+
+  describe("getRedirectMapJson", () => {
+    it("GETs the JSON redirect map and returns the mappings array", async () => {
+      const expected = {
+        mappings: [{ from: "https://bit.ly/x", to: "https://awsys.co/x" }],
+      };
+      vi.mocked(http.get).mockResolvedValue(expected);
+
+      const result = await imports.getRedirectMapJson("imp_123");
+
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports/imp_123/redirect-map.json",
+      );
+      expect(result).toEqual(expected);
     });
   });
 });

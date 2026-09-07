@@ -17,11 +17,11 @@ function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
 }
 
 const client = new AwsysClient({
-  apiKey: process.env.AWSYS_API_KEY!,
+  apiKey: process.env.AWSYS_API_KEY ?? "awsys_test_placeholder",
   baseUrl: process.env.AWSYS_BASE_URL ?? "https://staging.awsys.co",
 });
 
-describe("Links", () => {
+describe.skipIf(!process.env.AWSYS_API_KEY)("Links", () => {
   let createdShortCode: string;
   let setupSkip = false;
 
@@ -94,7 +94,8 @@ describe("Links", () => {
       const result = await client.links.list({ limit: 5 });
 
       expect(Array.isArray(result.data)).toBe(true);
-      expect(typeof result.total).toBe("number");
+      expect(typeof result.limit).toBe("number");
+      expect(typeof result.offset).toBe("number");
       expect(typeof result.hasMore).toBe("boolean");
     });
 
@@ -111,23 +112,20 @@ describe("Links", () => {
       if (result.data.length > 0) {
         const link = result.data[0];
         expect(link.id).toBeTruthy();
-        expect(link.short).toBeTruthy();
+        // Wire field is `shortCode` (confirmed against contracts/sdk-contract.json's
+        // list_links scenario) — `short` was never a real field.
+        expect(link.shortCode).toBeTruthy();
         expect(link.long).toBeTruthy();
         expect(typeof link.clicks).toBe("number");
       }
     });
   });
 
-  describe("get (production endpoint — staging returns 404)", () => {
-    it("throws an error when the route does not exist on staging", async (ctx) => {
+  describe("get", () => {
+    it("returns the link (now reachable on staging — PR #811 fixed the API-key auth gate)", async (ctx) => {
       if (setupSkip) ctx.skip();
-      let threw = false;
-      try {
-        await client.links.get(createdShortCode);
-      } catch {
-        threw = true;
-      }
-      expect(threw).toBe(true);
+      const link = await client.links.get(createdShortCode);
+      expect(link.shortCode).toBe(createdShortCode);
     });
   });
 });

@@ -2,11 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { AwsysClient } from "../src/index.js";
 
 const client = new AwsysClient({
-  apiKey: process.env.AWSYS_API_KEY!,
+  apiKey: process.env.AWSYS_API_KEY ?? "awsys_test_placeholder",
   baseUrl: process.env.AWSYS_BASE_URL ?? "https://staging.awsys.co",
 });
 
-describe("Folders", () => {
+describe.skipIf(!process.env.AWSYS_API_KEY)("Folders", () => {
   let createdFolderId: string;
   let linkShortCode: string;
   let setupSkip = false;

@@ -1,3 +1,5 @@
+import { inspect } from "node:util";
+import { AwsysConfigurationError } from "./errors.js";
 import { HttpClient } from "./http.js";
 import { AffiliateResource } from "./resources/affiliate.js";
 import { AgentlinkResource } from "./resources/agentlink.js";
@@ -10,6 +12,7 @@ import { ImportsResource } from "./resources/imports.js";
 import { LinksResource } from "./resources/links.js";
 import { MeResource } from "./resources/me.js";
 import { NamespaceResource } from "./resources/namespace.js";
+import { ProfileResource } from "./resources/profile.js";
 import { QRResource } from "./resources/qr.js";
 import { SavedViewsResource } from "./resources/savedViews.js";
 import { TagsResource } from "./resources/tags.js";
@@ -74,14 +77,31 @@ export class AwsysClient {
   readonly web2app: Web2AppResource;
   /** Imports resource — migrate links from external providers (e.g. Bitly) */
   readonly imports: ImportsResource;
+  /** Profile resource — get/update the authenticated user's editable profile */
+  readonly profile: ProfileResource;
+
+  /** Redacted for logging/inspection — never the raw key. */
+  private readonly redactedApiKey: string;
+  private readonly resolvedBaseUrl: string;
 
   constructor(config: AwsysClientConfig) {
-    if (!config.apiKey) {
-      throw new Error("AwsysClient: apiKey is required");
+    const env = typeof process !== "undefined" ? process.env : undefined;
+
+    const apiKey = config.apiKey ?? env?.AWSYS_API_KEY;
+    if (!apiKey) {
+      throw new AwsysConfigurationError(
+        "AwsysClient: apiKey is required (pass it directly or set AWSYS_API_KEY)",
+        "MISSING_API_KEY",
+      );
     }
 
-    const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-    const http = new HttpClient(config.apiKey, baseUrl, config.maxRetries);
+    const baseUrl = validateBaseUrl(config.baseUrl ?? env?.AWSYS_BASE_URL ?? DEFAULT_BASE_URL);
+
+    this.redactedApiKey =
+      apiKey.length > 4 ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}` : "awsys_...";
+    this.resolvedBaseUrl = baseUrl;
+
+    const http = new HttpClient(apiKey, baseUrl, config.maxRetries, config.timeoutMs);
 
     this.links = new LinksResource(http);
     this.analytics = new AnalyticsResource(http);
@@ -102,5 +122,46 @@ export class AwsysClient {
     this.usage = new UsageResource(http);
     this.web2app = new Web2AppResource(http);
     this.imports = new ImportsResource(http);
+    this.profile = new ProfileResource(http);
   }
+
+  /**
+   * Redacted representation used by `JSON.stringify(client)` — never
+   * includes the raw API key.
+   */
+  toJSON(): { baseUrl: string; apiKey: string } {
+    return { baseUrl: this.resolvedBaseUrl, apiKey: this.redactedApiKey };
+  }
+
+  /**
+   * Redacted representation used by `console.log`/`util.inspect(client)` —
+   * never includes the raw API key.
+   */
+  [inspect.custom](): string {
+    return `AwsysClient ${inspect(this.toJSON())}`;
+  }
+}
+
+/**
+ * Validates a base URL is `http(s)://…` before any network call is made.
+ * Strips a trailing slash. Non-`http(s)` schemes (or a missing scheme
+ * entirely, e.g. a bare host) are rejected as a configuration error.
+ */
+function validateBaseUrl(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new AwsysConfigurationError(
+      `AwsysClient: baseUrl "${raw}" is not a valid URL`,
+      "INVALID_BASE_URL",
+    );
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new AwsysConfigurationError(
+      `AwsysClient: baseUrl "${raw}" must use http:// or https://`,
+      "INVALID_BASE_URL",
+    );
+  }
+  return raw.replace(/\/$/, "");
 }

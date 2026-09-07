@@ -52,20 +52,20 @@ describe("WebhooksResource", () => {
   });
 
   describe("list", () => {
-    it("calls GET /api/webhooks and returns webhooks list", async () => {
+    it("calls GET /api/v1/webhooks (versioned — preferred where both exist) and returns webhooks list", async () => {
       const expected = { webhooks: [sampleWebhook], limit: 10, used: 1 };
       vi.mocked(http.get).mockResolvedValue(expected);
 
       const result = await webhooks.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/webhooks");
+      expect(http.get).toHaveBeenCalledWith("/api/v1/webhooks");
       expect(result.webhooks).toHaveLength(1);
       expect(result.limit).toBe(10);
     });
   });
 
   describe("create", () => {
-    it("calls POST /api/webhooks and returns the created webhook", async () => {
+    it("calls POST /api/v1/webhooks and returns the created webhook", async () => {
       const opts = {
         url: "https://example.com/hook",
         events: ["link.created"],
@@ -75,7 +75,7 @@ describe("WebhooksResource", () => {
 
       const result = await webhooks.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/webhooks", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks", opts);
       expect(result.id).toBe("wh1");
     });
 
@@ -89,7 +89,7 @@ describe("WebhooksResource", () => {
 
       await webhooks.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/webhooks", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks", opts);
     });
   });
 
@@ -106,24 +106,24 @@ describe("WebhooksResource", () => {
   });
 
   describe("delete", () => {
-    it("calls DELETE /api/webhooks/:id", async () => {
+    it("calls DELETE /api/v1/webhooks/:id", async () => {
       vi.mocked(http.delete).mockResolvedValue({ success: true });
 
       const result = await webhooks.delete("wh1");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/webhooks/wh1");
+      expect(http.delete).toHaveBeenCalledWith("/api/v1/webhooks/wh1");
       expect(result).toEqual({ success: true });
     });
   });
 
   describe("test", () => {
-    it("calls POST /api/webhooks/:id/test with eventType", async () => {
-      const expected = { success: true, statusCode: 200, responseTime: 145 };
+    it("calls POST /api/v1/webhooks/:id/test with eventType", async () => {
+      const expected = { success: true, statusCode: 200, durationMs: 145 };
       vi.mocked(http.post).mockResolvedValue(expected);
 
       const result = await webhooks.test("wh1", "link.created");
 
-      expect(http.post).toHaveBeenCalledWith("/api/webhooks/wh1/test", {
+      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks/wh1/test", {
         eventType: "link.created",
       });
       expect(result.statusCode).toBe(200);

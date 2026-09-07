@@ -46,34 +46,62 @@ describe("UtmTemplatesResource", () => {
   });
 
   describe("create", () => {
-    it("calls POST /api/user/utm-templates and returns the template", async () => {
+    it("normalizes source/medium/campaign to the wire fields utmSource/utmMedium/utmCampaign", async () => {
       const opts = { name: "Launch", source: "twitter", medium: "social", campaign: "launch" };
-      const expected = {
-        success: true,
-        template: { id: "t2", ...opts },
-      };
+      const expected = { id: "t2", name: "Launch" };
       vi.mocked(http.post).mockResolvedValue(expected);
 
       const result = await utmTemplates.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", {
+        name: "Launch",
+        utmSource: "twitter",
+        utmMedium: "social",
+        utmCampaign: "launch",
+      });
       expect(result).toEqual(expected);
+    });
+
+    it("prefers utmSource/utmMedium/utmCampaign when both old and new fields are given", async () => {
+      vi.mocked(http.post).mockResolvedValue({ id: "t2", name: "Launch" });
+
+      await utmTemplates.create({
+        name: "Launch",
+        source: "ignored",
+        utmSource: "twitter",
+        utmMedium: "social",
+        utmCampaign: "launch",
+      });
+
+      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", {
+        name: "Launch",
+        utmSource: "twitter",
+        utmMedium: "social",
+        utmCampaign: "launch",
+      });
     });
 
     it("includes optional term and content fields when provided", async () => {
       const opts = {
         name: "Detailed",
-        source: "google",
-        medium: "cpc",
-        campaign: "brand",
+        utmSource: "google",
+        utmMedium: "cpc",
+        utmCampaign: "brand",
         term: "url shortener",
         content: "ad-variant-b",
       };
-      vi.mocked(http.post).mockResolvedValue({ success: true, template: { id: "t3", ...opts } });
+      vi.mocked(http.post).mockResolvedValue({ id: "t3", ...opts });
 
       await utmTemplates.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", {
+        name: "Detailed",
+        utmSource: "google",
+        utmMedium: "cpc",
+        utmCampaign: "brand",
+        term: "url shortener",
+        content: "ad-variant-b",
+      });
     });
   });
 

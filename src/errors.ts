@@ -1,3 +1,5 @@
+import { inspect } from "node:util";
+
 /**
  * Base error class for all AWSYS.CO SDK errors.
  */
@@ -6,7 +8,12 @@ export class AwsysError extends Error {
   readonly status: number;
   /** API error code from the response body */
   readonly code: string;
-  /** Raw response body */
+  /**
+   * Raw response body. Available for debugging, but deliberately EXCLUDED
+   * from `toJSON()`/`util.inspect()` output below — it may echo back
+   * sensitive request fields (e.g. an import's `accessToken`) and must
+   * never end up in a log line or `JSON.stringify(error)`.
+   */
   readonly raw: unknown;
 
   constructor(message: string, status: number, code: string, raw: unknown) {
@@ -17,6 +24,16 @@ export class AwsysError extends Error {
     this.raw = raw;
     // Maintain proper prototype chain
     Object.setPrototypeOf(this, new.target.prototype);
+  }
+
+  /** Redacted for `JSON.stringify(error)` — `raw` is deliberately omitted. */
+  toJSON(): { name: string; message: string; status: number; code: string } {
+    return { name: this.name, message: this.message, status: this.status, code: this.code };
+  }
+
+  /** Redacted for `console.log`/`util.inspect(error)` — `raw` is deliberately omitted. */
+  [inspect.custom](): string {
+    return `${this.name}: ${this.message} (status=${this.status}, code=${this.code})`;
   }
 }
 
@@ -70,16 +87,20 @@ export class AwsysConflictError extends AwsysError {
 export class AwsysRateLimitError extends AwsysError {
   /** Seconds to wait before retrying, if provided by the server */
   readonly retryAfter?: number;
+  /** ISO timestamp (or provider-specific string) when a quota resets, if provided */
+  readonly resetsAt?: string;
 
   constructor(
     message: string,
     code: string,
     raw: unknown,
     retryAfter?: number,
+    resetsAt?: string,
   ) {
     super(message, 429, code, raw);
     this.name = "AwsysRateLimitError";
     this.retryAfter = retryAfter;
+    this.resetsAt = resetsAt;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
@@ -91,6 +112,52 @@ export class AwsysValidationError extends AwsysError {
   constructor(message: string, code: string, raw: unknown) {
     super(message, 400, code, raw);
     this.name = "AwsysValidationError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown for any unmapped HTTP 5xx server error.
+ */
+export class AwsysServerError extends AwsysError {
+  constructor(message: string, status: number, code: string, raw: unknown) {
+    super(message, status, code, raw);
+    this.name = "AwsysServerError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown on transport-level failures (connection refused, DNS failure, etc.)
+ * where no HTTP response was received.
+ */
+export class AwsysNetworkError extends AwsysError {
+  constructor(message: string, code: string, raw: unknown) {
+    super(message, 0, code, raw);
+    this.name = "AwsysNetworkError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a request is aborted after exceeding its timeout.
+ */
+export class AwsysTimeoutError extends AwsysNetworkError {
+  constructor(message: string, code: string, raw: unknown) {
+    super(message, code, raw);
+    this.name = "AwsysTimeoutError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown for invalid client configuration (missing API key, malformed base
+ * URL, etc.) before any network call is made.
+ */
+export class AwsysConfigurationError extends AwsysError {
+  constructor(message: string, code: string = "CONFIGURATION_ERROR") {
+    super(message, 0, code, undefined);
+    this.name = "AwsysConfigurationError";
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
