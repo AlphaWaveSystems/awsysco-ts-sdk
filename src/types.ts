@@ -384,7 +384,8 @@ export interface UsageLimits {
   apiCallsPerMonth: number;
   qrCodes: number | 'unlimited';
   folders: number | 'unlimited';
-  customSlugs: number;
+  /** A feature flag on some tiers, a count on others — platform-defined. */
+  customSlugs: number | boolean;
 }
 
 export interface UsageOverage {
@@ -393,7 +394,7 @@ export interface UsageOverage {
   expiresAt: string | null;
   hoursUntilDrop: number | null;
   clicksThisCycle: number;
-  spendingLimitCents: number;
+  spendingLimitCents: number | null;
   estimatedChargeCents: number;
 }
 
@@ -404,41 +405,38 @@ export interface UsageOverage {
  * profile/plan limits — this returns the user's *current* consumption against
  * those limits (links/clicks/QR codes/API calls used this period, overage
  * state, etc.).
+ *
+ * Verified against the live `GET /api/user/stats` response (contract fixture
+ * 1.0.6, "usage" scenario) — every field below is a real, always-present wire
+ * field mapped 1:1 by name.
  */
 export interface UsageStats {
-  /** @deprecated not present on the actual GET /api/user/stats response. */
-  totalLinks?: number;
-  /** @deprecated not present on the actual response. */
-  totalClicks?: number;
-  /**
-   * @deprecated prefer `linksCreatedToday` (the wire field) — despite the
-   * "ThisMonth" name (a legacy naming artifact), this mirrors the daily
-   * count, not a monthly one. Kept for compat, mapped from `linksCreatedToday`.
-   */
-  linksCreatedThisMonth: number | undefined;
-  /** @deprecated not present on the actual response. */
-  qrCodesThisMonth?: number;
-  /** @deprecated not present on the actual response. */
-  folderCount?: number;
-  apiCallsThisMonth?: number;
-  /** @deprecated not present on the actual response. */
-  trackedClicksThisMonth?: number;
-  /** @deprecated not present on the actual response. */
-  tier?: string;
-  /** @deprecated not present on the actual response; see `dailyLimit`/`apiMonthlyLimit`. */
-  limits?: UsageLimits;
-  /** @deprecated not present on the actual response. */
-  hasApiKey?: boolean;
-  /** @deprecated not present on the actual response. */
-  apiKeyCreatedAt?: string | null;
-  /** @deprecated not present on the actual response. */
-  userPrefix?: string | null;
-  /** @deprecated not present on the actual response. */
-  isPremium?: boolean;
+  totalLinks: number;
+  totalClicks: number;
+  linksCreatedThisMonth: number;
+  qrCodesThisMonth: number;
+  folderCount: number;
+  apiCallsThisMonth: number;
+  trackedClicksThisMonth: number;
+  tier: string;
+  limits: UsageLimits;
+  hasApiKey: boolean;
+  apiKeyCreatedAt: string | null;
+  userPrefix: string | null;
+  isPremium: boolean;
   overage: UsageOverage;
+  /**
+   * @deprecated legacy field from an earlier (incorrect) understanding of
+   * this endpoint's shape — not present on the real response. Kept optional
+   * for source compatibility with pre-1.4.0 consumer code; will be removed
+   * in the next major.
+   */
   linksCreatedToday?: number;
+  /** @deprecated see `linksCreatedToday` — not present on the real response. */
   linksToday?: number;
+  /** @deprecated see `linksCreatedToday` — not present on the real response. */
   dailyLimit?: number;
+  /** @deprecated see `linksCreatedToday` — not present on the real response. */
   apiMonthlyLimit?: number;
 }
 

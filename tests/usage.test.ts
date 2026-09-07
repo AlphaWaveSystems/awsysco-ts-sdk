@@ -26,15 +26,14 @@ describe("UsageResource", () => {
   });
 
   describe("get", () => {
-    it("calls GET /api/user/stats and returns the parsed stats", async () => {
-      // The raw wire response — `linksCreatedThisMonth` is NOT a real
-      // platform field (see `linksCreatedThisMonth`'s @deprecated tsdoc in
-      // types.ts); the SDK derives it from `linksCreatedToday` below. The
-      // other legacy fields genuinely never appear on the wire, but pass
-      // through unchanged if present (proving the type stays open to them).
-      const raw = {
+    it("calls GET /api/user/stats and returns every field mapped 1:1 from the wire", async () => {
+      // Verified live against staging (contract fixture 1.0.6, "usage"
+      // scenario) — every field here is a real, always-present response
+      // field, mapped straight through with no renaming.
+      const raw: UsageStats = {
         totalLinks: 42,
         totalClicks: 1234,
+        linksCreatedThisMonth: 7,
         qrCodesThisMonth: 2,
         folderCount: 3,
         apiCallsThisMonth: 100,
@@ -63,19 +62,20 @@ describe("UsageResource", () => {
           spendingLimitCents: 5000,
           estimatedChargeCents: 0,
         },
-        linksCreatedToday: 5,
-        linksToday: 5,
       };
-      const expected: UsageStats = { ...raw, linksCreatedThisMonth: 5 };
       vi.mocked(http.get).mockResolvedValue(raw);
 
       const result = await usage.get();
 
-      expect(http.get).toHaveBeenCalledWith("/api/user/stats");
-      expect(result).toEqual(expected);
+      expect(http.get).toHaveBeenCalledWith("/api/user/stats", undefined, undefined);
+      expect(result).toEqual(raw);
+      // linksCreatedThisMonth maps directly from the wire's own field of
+      // the same name — NOT from a "linksCreatedToday" field (that was a
+      // prior, incorrect understanding of this endpoint's shape).
+      expect(result.linksCreatedThisMonth).toBe(7);
     });
 
-    it("handles 'unlimited' and numeric limit values", async () => {
+    it("handles 'unlimited' and numeric/boolean limit values", async () => {
       vi.mocked(http.get).mockResolvedValue({
         tier: "free",
         limits: {
@@ -86,13 +86,26 @@ describe("UsageResource", () => {
           apiCallsPerMonth: 0,
           qrCodes: 10,
           folders: 3,
-          customSlugs: 0,
+          customSlugs: false,
         },
       });
 
       const result = await usage.get();
       expect(result.limits.linksPerMonth).toBe(100);
       expect(result.limits.apiCallsPerMonth).toBe(0);
+      expect(result.limits.customSlugs).toBe(false);
+    });
+
+    it("forwards a per-call signal/timeoutMs override", async () => {
+      vi.mocked(http.get).mockResolvedValue({});
+      const controller = new AbortController();
+
+      await usage.get({ signal: controller.signal, timeoutMs: 5000 });
+
+      expect(http.get).toHaveBeenCalledWith("/api/user/stats", undefined, {
+        signal: controller.signal,
+        timeoutMs: 5000,
+      });
     });
   });
 });

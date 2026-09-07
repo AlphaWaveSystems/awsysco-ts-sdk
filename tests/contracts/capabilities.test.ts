@@ -368,13 +368,9 @@ describe("Contract: capabilities — bulk / me / usage", () => {
     const s = mockScenario("usage");
     const result = await client.usage.get();
     expectRequestMatches(s);
-    // The SDK adds `linksCreatedThisMonth` as a deprecated alias mapped
-    // from the wire's `linksCreatedToday` — not present in the raw fixture.
-    expect(result).toEqual({
-      ...(s.response.body as Record<string, unknown>),
-      linksCreatedThisMonth: (s.response.body as { linksCreatedToday?: number })
-        .linksCreatedToday,
-    });
+    // Every UsageStats field maps 1:1 by name from the wire response
+    // (verified live, contract fixture 1.0.6) — plain passthrough now.
+    expect(result).toEqual(s.response.body);
   });
 });
 
