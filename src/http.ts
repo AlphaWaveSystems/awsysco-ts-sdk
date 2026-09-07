@@ -10,6 +10,10 @@ import {
   AwsysTimeoutError,
   AwsysValidationError,
 } from "./errors.js";
+import { SDK_VERSION } from "./version.js";
+
+const runtimeVersion = typeof process !== "undefined" ? process.version : "unknown";
+const USER_AGENT = `awsysco-ts-sdk/${SDK_VERSION} (node/${runtimeVersion})`;
 
 interface ErrorBody {
   // The AWSYS API uses `error: true` (boolean) as a flag, or a string used
@@ -148,6 +152,7 @@ export class HttpClient {
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
+      "User-Agent": USER_AGENT,
     };
   }
 
@@ -321,6 +326,7 @@ export class HttpClient {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
       Accept: "text/csv",
+      "User-Agent": USER_AGENT,
     };
     const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
 
