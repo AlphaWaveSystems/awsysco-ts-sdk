@@ -70,7 +70,7 @@ export class CustomDomainsResource {
    */
   async update(
     domain: string,
-    opts: { isDefault?: boolean; notFoundHtml?: string },
+    opts: { isDefault?: boolean; notFoundHtml?: string; defaultRedirect?: string },
   ): Promise<CustomDomain> {
     return this.http.patch<CustomDomain>(paths.customDomains.byDomain(domain), opts);
   }

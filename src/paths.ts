@@ -67,4 +67,29 @@ export const paths = {
     redirectMapJson: (jobId: string): string =>
       `/api/v1/imports/${encodeSegment(jobId)}/redirect-map.json`,
   },
+  tags: {
+    forLink: (shortPath: string): string => `/api/link/${encodeSegment(shortPath)}/tags`,
+    byTag: (shortPath: string, tag: string): string =>
+      `/api/link/${encodeSegment(shortPath)}/tags/${encodeSegment(tag)}`,
+  },
+  utmTemplates: {
+    /** No dedicated list route exists — list is derived from `/api/v1/me` (ADR-003). */
+    viaMe: "/api/v1/me",
+    create: "/api/user/utm-templates",
+    byId: (id: string): string => `/api/user/utm-templates/${encodeSegment(id)}`,
+  },
+  webhooks: {
+    /**
+     * `/api/v1/webhooks/*` is preferred over `/api/webhooks/*` where both
+     * exist (both accept API keys) — but not every action has a v1 twin.
+     * list/create/delete/test are versioned; update and event-types are not
+     * (verified against the contract fixture, which is authoritative here).
+     */
+    eventTypes: "/api/webhooks/event-types",
+    base: "/api/v1/webhooks",
+    byId: (webhookId: string): string => `/api/v1/webhooks/${encodeSegment(webhookId)}`,
+    /** Unversioned — no v1 twin for update. */
+    byIdForUpdate: (webhookId: string): string => `/api/webhooks/${encodeSegment(webhookId)}`,
+    test: (webhookId: string): string => `/api/v1/webhooks/${encodeSegment(webhookId)}/test`,
+  },
 };

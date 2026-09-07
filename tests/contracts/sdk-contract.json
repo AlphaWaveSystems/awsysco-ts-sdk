@@ -1,6 +1,6 @@
 {
  "$schema": "awsys-sdk-contract/1",
- "version": "1.0.1",
+ "version": "1.0.3",
  "platformBaseline": "2026-09",
  "baseUrl": "https://awsys.co",
  "auth": {
@@ -907,12 +907,31 @@
        "events": [
         "link.created"
        ],
-       "active": true
+       "name": "Unnamed Webhook",
+       "secret": "whsec_x",
+       "enabled": true,
+       "failureCount": 0,
+       "successCount": 0,
+       "lastTriggered": null,
+       "createdAt": "2026-09-01T00:00:00.000Z",
+       "updatedAt": null
+      },
+      {
+       "id": "w0",
+       "url": "https://legacy.example/",
+       "events": [
+        "link.click"
+       ],
+       "name": "Legacy",
+       "createdAt": "2026-06-01T00:00:00.000Z",
+       "lastDeliveryAt": null,
+       "lastStatus": null
       }
      ],
      "limit": 5
     }
-   }
+   },
+   "note": "serializeWebhook spreads the doc (services/webhooks.js:82); legacy docs (seen live on staging) lack enabled/secret \u2014 SDK models must treat every field except id/url/events as optional"
   },
   {
    "id": "webhook_create",
@@ -936,7 +955,14 @@
      "events": [
       "link.created"
      ],
-     "secret": "whsec_x"
+     "name": "Unnamed Webhook",
+     "secret": "whsec_x",
+     "enabled": true,
+     "failureCount": 0,
+     "successCount": 0,
+     "lastTriggered": null,
+     "createdAt": "2026-09-01T00:00:00.000Z",
+     "updatedAt": null
     }
    }
   },
@@ -948,16 +974,28 @@
     "path": "/api/webhooks/w1",
     "query": {},
     "body": {
-     "active": false
+     "enabled": false
     }
    },
    "response": {
     "status": 200,
     "body": {
      "id": "w1",
-     "active": false
+     "url": "https://h.example/",
+     "events": [
+      "link.created"
+     ],
+     "name": "Unnamed Webhook",
+     "secret": "whsec_x",
+     "enabled": false,
+     "failureCount": 0,
+     "successCount": 0,
+     "lastTriggered": null,
+     "createdAt": "2026-09-01T00:00:00.000Z",
+     "updatedAt": "2026-09-02T00:00:00.000Z"
     }
-   }
+   },
+   "note": "wire field is `enabled` (services/webhooks.js:122,150), never `active`"
   },
   {
    "id": "webhook_delete",

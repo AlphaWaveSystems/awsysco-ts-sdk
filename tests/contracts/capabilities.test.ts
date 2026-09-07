@@ -338,13 +338,404 @@ describe("Contract: capabilities — analytics (legacy call style)", () => {
   });
 });
 
-// Not yet covered this milestone (out of scope — resources untouched by
-// Milestone 1/2): tags, qr, customDomains (all but the deprecated activate()
-// above), savedViews, utmTemplates, webhooks, affiliate, agentlink,
-// namespace, dataExport, trustScore, bulk, usage, me, web2app. Their
-// capability scenarios are left for Milestone 3 once those resources are
-// routed through src/paths.ts. The "Contract: coverage" test below fails
-// loudly listing exactly which scenario IDs remain, per Gate 3.
+describe("Contract: capabilities — bulk / me / usage", () => {
+  it("bulk_create", async () => {
+    const s = mockScenario("bulk_create");
+    const result = await client.bulk.create({
+      urls: [{ url: "https://a.example/" }, { url: "https://b.example/", customSlug: "b" }],
+    });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("me", async () => {
+    const s = mockScenario("me");
+    const result = await client.me.get();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("usage", async () => {
+    const s = mockScenario("usage");
+    const result = await client.usage.get();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — qr", () => {
+  it("qr_url (client-side URL builder, no network call)", () => {
+    const s = markCovered("qr_url");
+    const url = client.qr.getUrl("abc123", { size: 300, color: "000000", bgColor: "ffffff" });
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe(s.request.path);
+    for (const [key, value] of Object.entries(s.request.query)) {
+      expect(parsed.searchParams.get(key)).toBe(String(value));
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("qr_settings_get", async () => {
+    const s = mockScenario("qr_settings_get");
+    const result = await client.qr.getSettings("abc123");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("qr_settings_update", async () => {
+    const s = mockScenario("qr_settings_update");
+    const result = await client.qr.updateSettings("abc123", { color: "#ff0000" });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — tags", () => {
+  it("tags_add (array body, folders.js:128 requires it)", async () => {
+    const s = mockScenario("tags_add");
+    const result = await client.tags.add("abc123", ["a", "b"]);
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("tag_remove", async () => {
+    const s = mockScenario("tag_remove");
+    const result = await client.tags.remove("abc123", "a");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — savedViews", () => {
+  it("views_list", async () => {
+    const s = mockScenario("views_list");
+    const result = await client.savedViews.list();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("view_create", async () => {
+    const s = mockScenario("view_create");
+    const result = await client.savedViews.create({ name: "Mine", filters: { tag: "a" } });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("view_update", async () => {
+    const s = mockScenario("view_update");
+    await client.savedViews.update("v1", { name: "Yours" });
+    expectRequestMatches(s);
+  });
+
+  it("view_delete", async () => {
+    const s = mockScenario("view_delete");
+    await client.savedViews.delete("v1");
+    expectRequestMatches(s);
+  });
+});
+
+describe("Contract: capabilities — utmTemplates", () => {
+  it("utm_list_via_me (no dedicated list route — ADR-003)", async () => {
+    const s = mockScenario("utm_list_via_me");
+    const result = await client.utmTemplates.list();
+    expectRequestMatches(s);
+    expect(result).toEqual((s.response.body as { utmTemplates: unknown[] }).utmTemplates);
+  });
+
+  it("utm_create (normalizes to utmSource/utmMedium/utmCampaign)", async () => {
+    const s = mockScenario("utm_create");
+    const result = await client.utmTemplates.create({
+      name: "Launch",
+      utmSource: "newsletter",
+      utmMedium: "email",
+      utmCampaign: "sept",
+    });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("utm_delete", async () => {
+    const s = mockScenario("utm_delete");
+    const result = await client.utmTemplates.delete("t1");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — webhooks", () => {
+  it("webhook_event_types (unversioned, no v1 twin)", async () => {
+    const s = mockScenario("webhook_event_types");
+    const result = await client.webhooks.listEventTypes();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("webhooks_list (versioned)", async () => {
+    const s = mockScenario("webhooks_list");
+    const result = await client.webhooks.list();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("webhook_create (versioned)", async () => {
+    const s = mockScenario("webhook_create");
+    const result = await client.webhooks.create({
+      url: "https://h.example/",
+      events: ["link.created"],
+    });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+    expect((result as { enabled?: boolean }).enabled).toBe(true);
+  });
+
+  it("webhook_update (unversioned — no v1 twin, enabled field)", async () => {
+    const s = mockScenario("webhook_update");
+    const result = await client.webhooks.update("w1", { enabled: false });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("webhook_delete (versioned)", async () => {
+    const s = mockScenario("webhook_delete");
+    const result = await client.webhooks.delete("w1");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("webhook_test (versioned)", async () => {
+    const s = mockScenario("webhook_test");
+    const result = await client.webhooks.test("w1", "link.created");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — customDomains", () => {
+  it("domains_list", async () => {
+    const s = mockScenario("domains_list");
+    const result = await client.customDomains.list();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("domain_add", async () => {
+    const s = mockScenario("domain_add");
+    const result = await client.customDomains.add("go.example.com");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("domain_verify", async () => {
+    const s = mockScenario("domain_verify");
+    const result = await client.customDomains.verify("go.example.com");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("domain_update", async () => {
+    const s = mockScenario("domain_update");
+    const result = await client.customDomains.update("go.example.com", {
+      defaultRedirect: "https://example.com/",
+    });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("domain_remove", async () => {
+    const s = mockScenario("domain_remove");
+    const result = await client.customDomains.remove("go.example.com");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("domain_check", async () => {
+    const s = mockScenario("domain_check");
+    const result = await client.customDomains.check("go.example.com");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — namespace", () => {
+  it("namespace_get", async () => {
+    const s = mockScenario("namespace_get");
+    const result = await client.namespace.get();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("namespace_check", async () => {
+    const s = mockScenario("namespace_check");
+    const result = await client.namespace.check("acme");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("namespace_claim", async () => {
+    const s = mockScenario("namespace_claim");
+    const result = await client.namespace.claim("acme");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("namespace_release", async () => {
+    const s = mockScenario("namespace_release");
+    const result = await client.namespace.release();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — affiliate", () => {
+  it("affiliate_program_create", async () => {
+    const s = mockScenario("affiliate_program_create");
+    const result = await client.affiliate.createProgram({ name: "P", commissionRate: 10 });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_programs_list (unwraps {programs:[]} envelope)", async () => {
+    const s = mockScenario("affiliate_programs_list");
+    const result = await client.affiliate.listPrograms();
+    expectRequestMatches(s);
+    expect(result).toEqual((s.response.body as { programs: unknown[] }).programs);
+  });
+
+  it("affiliate_program_get", async () => {
+    const s = mockScenario("affiliate_program_get");
+    const result = await client.affiliate.getProgram("p1");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_program_update", async () => {
+    const s = mockScenario("affiliate_program_update");
+    const result = await client.affiliate.updateProgram("p1", { name: "P2" });
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_program_stats", async () => {
+    const s = mockScenario("affiliate_program_stats");
+    const result = await client.affiliate.getProgramStats("p1", "30d");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_partners_list (unwraps {partners:[]} envelope)", async () => {
+    const s = mockScenario("affiliate_partners_list");
+    const result = await client.affiliate.listPartners("p1");
+    expectRequestMatches(s);
+    expect(result).toEqual((s.response.body as { partners: unknown[] }).partners);
+  });
+
+  it("affiliate_partner_status", async () => {
+    const s = mockScenario("affiliate_partner_status");
+    const result = await client.affiliate.updatePartnerStatus("p1", "pt1", "approved");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_discover (unwraps {programs:[]} envelope)", async () => {
+    const s = mockScenario("affiliate_discover");
+    const result = await client.affiliate.discover(20);
+    expectRequestMatches(s);
+    expect(result).toEqual((s.response.body as { programs: unknown[] }).programs);
+  });
+
+  it("affiliate_join", async () => {
+    const s = mockScenario("affiliate_join");
+    const result = await client.affiliate.join("p9", "CODE");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_partnerships_list (unwraps {partnerships:[]} envelope)", async () => {
+    const s = mockScenario("affiliate_partnerships_list");
+    const result = await client.affiliate.listPartnerships();
+    expectRequestMatches(s);
+    expect(result).toEqual((s.response.body as { partnerships: unknown[] }).partnerships);
+  });
+
+  it("affiliate_partnership_stats", async () => {
+    const s = mockScenario("affiliate_partnership_stats");
+    const result = await client.affiliate.getPartnershipStats("ps1", "30d");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_leave", async () => {
+    const s = mockScenario("affiliate_leave");
+    const result = await client.affiliate.leaveProgram("ps1");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("affiliate_limits", async () => {
+    const s = mockScenario("affiliate_limits");
+    const result = await client.affiliate.getLimits();
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — agentlink", () => {
+  it("agentlink_link_stats", async () => {
+    const s = mockScenario("agentlink_link_stats");
+    const result = await client.agentlink.getLinkStats("abc123", 30);
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("agentlink_account_stats", async () => {
+    const s = mockScenario("agentlink_account_stats");
+    const result = await client.agentlink.getAccountStats(30);
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+
+  it("agentlink_subscribe (public endpoint — auth header still sent)", async () => {
+    const s = mockScenario("agentlink_subscribe");
+    const result = await client.agentlink.subscribe("t@example.com");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — web2app", () => {
+  it("web2app_consume", async () => {
+    const s = mockScenario("web2app_consume");
+    const result = await client.web2app.consumeSession("tok123");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — export", () => {
+  it("export_links_csv", async () => {
+    const s = mockScenario("export_links_csv", true);
+    const result = await client.dataExport.exportLinks();
+    expectRequestMatches(s);
+    expect(result).toBe(s.response.body);
+  });
+
+  it("export_link_stats_csv", async () => {
+    const s = mockScenario("export_link_stats_csv", true);
+    const result = await client.dataExport.exportLinkStats("abc123");
+    expectRequestMatches(s);
+    expect(result).toBe(s.response.body);
+  });
+});
+
+describe("Contract: capabilities — trustScore", () => {
+  it("trust_scan (public endpoint — auth header still sent)", async () => {
+    const s = mockScenario("trust_scan");
+    const result = await client.trustScore.scan("abc123");
+    expectRequestMatches(s);
+    expect(result).toEqual(s.response.body);
+  });
+});
+
 describe("Contract: coverage", () => {
   it("every capability scenario is exercised by a test in this file (Gate 3)", () => {
     // Depends on every `it` above having already run and populated

@@ -20,7 +20,10 @@ export class AffiliateResource {
    * List all affiliate programs owned by the authenticated user.
    */
   async listPrograms(): Promise<AffiliateProgram[]> {
-    return this.http.get<AffiliateProgram[]>("/api/affiliate/programs");
+    const raw = await this.http.get<{ programs: AffiliateProgram[] }>(
+      "/api/affiliate/programs",
+    );
+    return raw.programs;
   }
 
   /**
@@ -64,9 +67,10 @@ export class AffiliateResource {
    * List all partners for an affiliate program.
    */
   async listPartners(programId: string): Promise<AffiliatePartner[]> {
-    return this.http.get<AffiliatePartner[]>(
+    const raw = await this.http.get<{ partners: AffiliatePartner[] }>(
       `/api/affiliate/programs/${encodeURIComponent(programId)}/partners`,
     );
+    return raw.partners;
   }
 
   /**
@@ -95,7 +99,11 @@ export class AffiliateResource {
   async discover(limit?: number): Promise<AffiliateProgram[]> {
     const params: Record<string, string | number> = {};
     if (limit !== undefined) params.limit = limit;
-    return this.http.get<AffiliateProgram[]>("/api/affiliate/discover", params);
+    const raw = await this.http.get<{ programs: AffiliateProgram[] }>(
+      "/api/affiliate/discover",
+      params,
+    );
+    return raw.programs;
   }
 
   /**
@@ -117,7 +125,10 @@ export class AffiliateResource {
    * List all affiliate partnerships the authenticated user has joined.
    */
   async listPartnerships(): Promise<AffiliatePartnership[]> {
-    return this.http.get<AffiliatePartnership[]>("/api/affiliate/partnerships");
+    const raw = await this.http.get<{ partnerships: AffiliatePartnership[] }>(
+      "/api/affiliate/partnerships",
+    );
+    return raw.partnerships;
   }
 
   /**

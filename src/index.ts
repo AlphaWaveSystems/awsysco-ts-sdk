@@ -16,6 +16,9 @@ export {
   AwsysValidationError,
 } from "./errors.js";
 
+// Utilities
+export { parseTimestamp } from "./timestamps.js";
+
 // Resource classes
 export { AffiliateResource } from "./resources/affiliate.js";
 export { AgentlinkResource } from "./resources/agentlink.js";

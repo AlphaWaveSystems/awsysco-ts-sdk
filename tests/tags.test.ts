@@ -25,7 +25,7 @@ describe("TagsResource", () => {
   });
 
   describe("add", () => {
-    it("calls POST /api/link/:short/tags with { tag }", async () => {
+    it("calls POST /api/link/:short/tags with { tags: [...] } (platform requires an array — folders.js:128)", async () => {
       const expected = { success: true, tags: ["launch", "social"] };
       vi.mocked(http.post).mockResolvedValue(expected);
 
@@ -33,9 +33,21 @@ describe("TagsResource", () => {
 
       expect(http.post).toHaveBeenCalledWith(
         "/api/link/abc123/tags",
-        { tag: "social" },
+        { tags: ["social"] },
       );
       expect(result).toEqual(expected);
+    });
+
+    it("accepts an array of tags directly", async () => {
+      const expected = { success: true, tags: ["a", "b"] };
+      vi.mocked(http.post).mockResolvedValue(expected);
+
+      await tags.add("abc123", ["a", "b"]);
+
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/link/abc123/tags",
+        { tags: ["a", "b"] },
+      );
     });
 
     it("URL-encodes namespaced short paths", async () => {
@@ -45,7 +57,7 @@ describe("TagsResource", () => {
 
       expect(http.post).toHaveBeenCalledWith(
         "/api/link/ns%2Fslug/tags",
-        { tag: "x" },
+        { tags: ["x"] },
       );
     });
   });

@@ -405,20 +405,36 @@ export interface UsageOverage {
  * state, etc.).
  */
 export interface UsageStats {
-  totalLinks: number;
-  totalClicks: number;
-  linksCreatedThisMonth: number;
-  qrCodesThisMonth: number;
-  folderCount: number;
-  apiCallsThisMonth: number;
-  trackedClicksThisMonth: number;
-  tier: string;
-  limits: UsageLimits;
-  hasApiKey: boolean;
-  apiKeyCreatedAt: string | null;
-  userPrefix: string | null;
-  isPremium: boolean;
+  /** @deprecated not present on the actual GET /api/user/stats response. */
+  totalLinks?: number;
+  /** @deprecated not present on the actual response. */
+  totalClicks?: number;
+  /** @deprecated wire field is `linksCreatedToday`/`linksToday`. */
+  linksCreatedThisMonth?: number;
+  /** @deprecated not present on the actual response. */
+  qrCodesThisMonth?: number;
+  /** @deprecated not present on the actual response. */
+  folderCount?: number;
+  apiCallsThisMonth?: number;
+  /** @deprecated not present on the actual response. */
+  trackedClicksThisMonth?: number;
+  /** @deprecated not present on the actual response. */
+  tier?: string;
+  /** @deprecated not present on the actual response; see `dailyLimit`/`apiMonthlyLimit`. */
+  limits?: UsageLimits;
+  /** @deprecated not present on the actual response. */
+  hasApiKey?: boolean;
+  /** @deprecated not present on the actual response. */
+  apiKeyCreatedAt?: string | null;
+  /** @deprecated not present on the actual response. */
+  userPrefix?: string | null;
+  /** @deprecated not present on the actual response. */
+  isPremium?: boolean;
   overage: UsageOverage;
+  linksCreatedToday?: number;
+  linksToday?: number;
+  dailyLimit?: number;
+  apiMonthlyLimit?: number;
 }
 
 // ─── Web2App ─────────────────────────────────────────────────────────────────
@@ -486,10 +502,17 @@ export interface TagsResult {
 // ─── Trust Score ─────────────────────────────────────────────────────────────
 
 export interface TrustScoreResult {
-  short: string;
-  long: string;
-  score: number | null;
-  status: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  /** Wire field is `shortCode` (links.js:566) — kept optional for compat, never populated. */
+  short?: string;
+  /** @deprecated not present on the actual response. */
+  long?: string;
+  /** @deprecated wire field is `trustScore` (links.js:567). */
+  score?: number | null;
+  /** @deprecated wire field is `trustStatus` (links.js:568). */
+  status?: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  shortCode?: string;
+  trustScore?: number | null;
+  trustStatus?: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
   threats?: string[];
   scannedAt?: string | null;
 }
@@ -515,34 +538,55 @@ export interface NamespaceCheckResult {
 export interface UtmTemplate {
   id: string;
   name: string;
-  source: string;
-  medium: string;
-  campaign: string;
+  /** @deprecated wire field is `utmSource` — this alias is never populated. Kept for compat. */
+  source?: string;
+  /** @deprecated wire field is `utmMedium` — this alias is never populated. Kept for compat. */
+  medium?: string;
+  /** @deprecated wire field is `utmCampaign` — this alias is never populated. Kept for compat. */
+  campaign?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
   term?: string;
   content?: string;
 }
 
 export interface CreateUtmTemplateOptions {
   name: string;
-  source: string;
-  medium: string;
-  campaign: string;
+  /** @deprecated use `utmSource` — the platform reads `utmSource`, not `source`. Kept for compat; ignored if `utmSource` is also set. */
+  source?: string;
+  /** @deprecated use `utmMedium`. */
+  medium?: string;
+  /** @deprecated use `utmCampaign`. */
+  campaign?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
   term?: string;
   content?: string;
 }
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
 
+/**
+ * `serializeWebhook` on the platform spreads the stored doc as-is
+ * (services/webhooks.js:82) — legacy webhook docs seen live on staging lack
+ * `enabled`/`secret` entirely, so every field except `id`/`url`/`events` is
+ * optional here. `enabled` must never be assumed `true` when absent.
+ */
 export interface Webhook {
   id: string;
   url: string;
   events: string[];
   name?: string;
-  enabled: boolean;
-  createdAt: string | null;
-  updatedAt: string | null;
-  lastTriggered: string | null;
+  /** Wire field is `enabled` (services/webhooks.js:122,150), never `active`. Absent on legacy docs — do not default to `true`. */
+  enabled?: boolean;
+  secret?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  lastTriggered?: string | null;
   failureCount?: number;
+  successCount?: number;
 }
 
 export interface WebhookEventType {
@@ -622,10 +666,15 @@ export interface AgentClickEntry {
 }
 
 export interface AgentLinkStats {
+  shortCode?: string;
+  /** @deprecated wire field is `shortCode`. */
   short?: string;
-  totalAgentClicks: number;
-  agentClicks: AgentClickEntry[];
-  periodDays: number;
+  agentClicks: number;
+  clicks?: AgentClickEntry[];
+  byAgent?: Record<string, number>;
+  /** @deprecated the wire response does not include a separate total distinct from `agentClicks`. */
+  totalAgentClicks?: number;
+  periodDays?: number;
 }
 
 // ─── Affiliate ───────────────────────────────────────────────────────────────
@@ -645,9 +694,11 @@ export interface AffiliateProgram {
 export interface CreateAffiliateProgramOptions {
   name: string;
   description?: string;
-  commissionType: 'cpc' | 'cpa_return' | 'both';
+  /** @deprecated the platform accepts a single `commissionRate` — kept optional for compat. */
+  commissionType?: 'cpc' | 'cpa_return' | 'both';
   cpcRate?: number;
   cpaRate?: number;
+  commissionRate?: number;
   cookieDays?: number;
 }
 

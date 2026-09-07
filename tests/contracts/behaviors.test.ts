@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AwsysClient } from "../../src/index.js";
 import { AwsysConfigurationError, AwsysAuthError } from "../../src/errors.js";
+import { parseTimestamp } from "../../src/timestamps.js";
 import type { AwsysClientConfig } from "../../src/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,12 +35,15 @@ afterEach(() => {
 //   - auth_header
 //   - unknown_fields_preserved
 //
-// Added this milestone (Milestone 2):
+// Added Milestone 2:
 //   - redaction, user_agent, base_url_override, missing_api_key, iterator_links
 //
-// Still deferred — no Firestore-timestamp parsing helper exists yet, not in
-// Milestone 2's scope (config/redaction/UA/listAll/deprecation):
-//   - timestamp_variants
+// Added Milestone 3:
+//   - timestamp_variants (src/timestamps.ts's parseTimestamp() — exported
+//     for consumers who want to normalize a raw timestamp field; the SDK
+//     itself does not transform response bodies for any other field either,
+//     so this is opt-in rather than applied automatically. See ADR-017:
+//     returns an ISO string, not a Date, for the 1.x line.)
 
 describe("Contract: behaviors — auth_header", () => {
   it("sends Authorization: Bearer <key> on every authenticated request", async () => {
@@ -215,5 +219,29 @@ describe("Contract: behaviors — iterator_links", () => {
 
     expect(collected).toHaveLength(3);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Contract: behaviors — timestamp_variants", () => {
+  it("passes through a plain ISO string unchanged", () => {
+    expect(parseTimestamp("2026-09-01T00:00:00.000Z")).toBe("2026-09-01T00:00:00.000Z");
+  });
+
+  it("parses a Firestore {_seconds,_nanoseconds} shape to an ISO string", () => {
+    const result = parseTimestamp({ _seconds: 1756684800, _nanoseconds: 0 });
+    expect(result).toBe(new Date(1756684800 * 1000).toISOString());
+  });
+
+  it("parses a {seconds,nanoseconds} shape (no underscore) to an ISO string", () => {
+    const result = parseTimestamp({ seconds: 1756684800, nanoseconds: 500_000_000 });
+    expect(result).toBe(new Date(1756684800 * 1000 + 500).toISOString());
+  });
+
+  it("keeps an unrecognized shape as-is rather than throwing", () => {
+    const garbage = { totally: "unrelated" };
+    expect(parseTimestamp(garbage)).toBe(garbage);
+    expect(parseTimestamp(null)).toBe(null);
+    expect(parseTimestamp(undefined)).toBe(undefined);
+    expect(parseTimestamp(42)).toBe(42);
   });
 });
