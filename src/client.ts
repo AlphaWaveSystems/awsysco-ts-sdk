@@ -10,6 +10,7 @@ import { ImportsResource } from "./resources/imports.js";
 import { LinksResource } from "./resources/links.js";
 import { MeResource } from "./resources/me.js";
 import { NamespaceResource } from "./resources/namespace.js";
+import { ProfileResource } from "./resources/profile.js";
 import { QRResource } from "./resources/qr.js";
 import { SavedViewsResource } from "./resources/savedViews.js";
 import { TagsResource } from "./resources/tags.js";
@@ -74,6 +75,8 @@ export class AwsysClient {
   readonly web2app: Web2AppResource;
   /** Imports resource — migrate links from external providers (e.g. Bitly) */
   readonly imports: ImportsResource;
+  /** Profile resource — get/update the authenticated user's editable profile */
+  readonly profile: ProfileResource;
 
   constructor(config: AwsysClientConfig) {
     if (!config.apiKey) {
@@ -81,7 +84,12 @@ export class AwsysClient {
     }
 
     const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-    const http = new HttpClient(config.apiKey, baseUrl, config.maxRetries);
+    const http = new HttpClient(
+      config.apiKey,
+      baseUrl,
+      config.maxRetries,
+      config.timeoutMs,
+    );
 
     this.links = new LinksResource(http);
     this.analytics = new AnalyticsResource(http);
@@ -102,5 +110,6 @@ export class AwsysClient {
     this.usage = new UsageResource(http);
     this.web2app = new Web2AppResource(http);
     this.imports = new ImportsResource(http);
+    this.profile = new ProfileResource(http);
   }
 }

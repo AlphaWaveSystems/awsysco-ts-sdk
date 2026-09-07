@@ -4,11 +4,15 @@ export { AwsysClient, DEFAULT_BASE_URL } from "./client.js";
 // Errors
 export {
   AwsysAuthError,
+  AwsysConfigurationError,
   AwsysConflictError,
   AwsysError,
   AwsysForbiddenError,
+  AwsysNetworkError,
   AwsysNotFoundError,
   AwsysRateLimitError,
+  AwsysServerError,
+  AwsysTimeoutError,
   AwsysValidationError,
 } from "./errors.js";
 
@@ -24,6 +28,7 @@ export { ImportsResource } from "./resources/imports.js";
 export { LinksResource } from "./resources/links.js";
 export { MeResource } from "./resources/me.js";
 export { NamespaceResource } from "./resources/namespace.js";
+export { ProfileResource } from "./resources/profile.js";
 export { QRResource } from "./resources/qr.js";
 export { SavedViewsResource } from "./resources/savedViews.js";
 export { TagsResource } from "./resources/tags.js";
@@ -64,7 +69,10 @@ export type {
   CustomDomain,
   Folder,
   GeoRestriction,
+  GetRecentClicksOptions,
   ImportJob,
+  ImportRedirectMap,
+  ImportRedirectMapEntry,
   Link,
   LinkStats,
   ListLinksOptions,
@@ -78,6 +86,8 @@ export type {
   PaginationParams,
   QRCodeOptions,
   QRSettings,
+  RecentClickEntry,
+  RecentClicksResult,
   RoutingRule,
   SavedView,
   SavedViewFilters,
@@ -85,11 +95,13 @@ export type {
   TrustScoreResult,
   UpdateFolderOptions,
   UpdateLinkOptions,
+  UpdateProfileOptions,
   UpdateSavedViewOptions,
   UpdateWebhookOptions,
   UsageLimits,
   UsageOverage,
   UsageStats,
+  UserProfile,
   UtmTemplate,
   Web2AppSession,
   Webhook,

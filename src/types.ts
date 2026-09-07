@@ -9,17 +9,30 @@ export interface AwsysClientConfig {
    */
   baseUrl?: string;
   /**
-   * Maximum number of automatic retries on 429 responses.
+   * Maximum number of automatic retries on 429 responses, and on 502/503/504
+   * or transport errors for idempotent methods (GET/PUT/DELETE).
    * @default 3
    */
   maxRetries?: number;
+  /**
+   * Per-request timeout in milliseconds, enforced via `AbortController`.
+   * Overridable per call via `{ timeoutMs }` on individual resource methods
+   * that accept request options.
+   * @default 30000
+   */
+  timeoutMs?: number;
 }
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
 
+/**
+ * Note: there is no `total` field — the platform does not return a total
+ * count across all pages, only whether more pages exist (`hasMore`).
+ */
 export interface PaginatedResponse<T> {
   data: T[];
-  total: number;
+  limit: number;
+  offset: number;
   hasMore: boolean;
 }
 
@@ -170,6 +183,30 @@ export interface ClickEvent {
 }
 
 /**
+ * A single entry returned by `client.analytics.getRecentClicks()`.
+ */
+export interface RecentClickEntry {
+  shortCode: string;
+  timestamp: string | null;
+  country: string | null;
+}
+
+export interface GetRecentClicksOptions {
+  /** Maximum number of recent click events to return */
+  limit?: number;
+  /** ISO 8601 timestamp; only return clicks after this time */
+  since?: string;
+}
+
+/**
+ * Response shape for `GET /api/user/clicks/recent`.
+ */
+export interface RecentClicksResult {
+  clicks: RecentClickEntry[];
+  count: number;
+}
+
+/**
  * Compact per-link breakdown nested inside {@link LinkStats}.
  */
 export interface AggregateStats {
@@ -313,6 +350,25 @@ export interface Me {
   limits?: MeLimits;
 }
 
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+/**
+ * The authenticated user's editable profile, returned by
+ * `client.profile.get()`/`client.profile.update()`. Distinct from
+ * {@link Me} (static plan/feature info) and {@link UsageStats} (live
+ * consumption).
+ */
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string | null;
+  subscriptionTier?: string;
+}
+
+export interface UpdateProfileOptions {
+  displayName?: string;
+}
+
 // ─── Usage ───────────────────────────────────────────────────────────────────
 
 export interface UsageLimits {
@@ -398,6 +454,22 @@ export interface ImportJob {
   errors: string[];
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+/**
+ * A single old-URL → new-URL mapping entry in an import job's redirect map,
+ * returned by `client.imports.getRedirectMapJson()`.
+ */
+export interface ImportRedirectMapEntry {
+  from: string;
+  to: string;
+}
+
+/**
+ * Response shape for `GET /api/v1/imports/:jobId/redirect-map.json`.
+ */
+export interface ImportRedirectMap {
+  mappings: ImportRedirectMapEntry[];
 }
 
 // ─── Tags ────────────────────────────────────────────────────────────────────
