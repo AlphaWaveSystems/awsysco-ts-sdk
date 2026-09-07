@@ -1,9 +1,14 @@
 import { AwsysForbiddenError } from "../errors.js";
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type { AddDomainResult, CustomDomain } from "../types.js";
 
 let activateDeprecationWarned = false;
+
+function mapCustomDomain(raw: CustomDomain): CustomDomain {
+  return mapTimestampFields(raw, ["createdAt"]);
+}
 
 export class CustomDomainsResource {
   constructor(private readonly http: HttpClient) {}
@@ -14,11 +19,12 @@ export class CustomDomainsResource {
   async list(
     options?: RequestOptions,
   ): Promise<{ domains: CustomDomain[]; monthlyPrice?: number }> {
-    return this.http.get<{ domains: CustomDomain[]; monthlyPrice?: number }>(
+    const raw = await this.http.get<{ domains: CustomDomain[]; monthlyPrice?: number }>(
       paths.customDomains.base,
       undefined,
       options,
     );
+    return { ...raw, domains: (raw.domains ?? []).map(mapCustomDomain) };
   }
 
   /**
@@ -84,7 +90,12 @@ export class CustomDomainsResource {
     opts: { isDefault?: boolean; notFoundHtml?: string; defaultRedirect?: string },
     options?: RequestOptions,
   ): Promise<CustomDomain> {
-    return this.http.patch<CustomDomain>(paths.customDomains.byDomain(domain), opts, options);
+    const raw = await this.http.patch<CustomDomain>(
+      paths.customDomains.byDomain(domain),
+      opts,
+      options,
+    );
+    return mapCustomDomain(raw);
   }
 
   /**

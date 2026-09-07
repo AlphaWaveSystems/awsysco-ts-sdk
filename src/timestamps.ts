@@ -37,3 +37,21 @@ export function parseTimestamp(value: unknown): unknown {
 
   return value;
 }
+
+/**
+ * Returns a shallow copy of `obj` with each named field run through
+ * {@link parseTimestamp}. Fields absent from `obj` are left untouched
+ * (not added as `undefined`).
+ */
+export function mapTimestampFields<T extends object>(
+  obj: T,
+  fields: readonly (keyof T)[],
+): T {
+  const result: T = { ...obj };
+  for (const field of fields) {
+    if (field in result) {
+      (result as Record<keyof T, unknown>)[field] = parseTimestamp(result[field]);
+    }
+  }
+  return result;
+}

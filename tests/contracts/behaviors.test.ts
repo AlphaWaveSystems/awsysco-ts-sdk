@@ -40,10 +40,7 @@ afterEach(() => {
 //   - redaction, user_agent, base_url_override, missing_api_key, iterator_links
 //
 // Added Milestone 3:
-//   - timestamp_variants (src/timestamps.ts's parseTimestamp() — exported
-//     for consumers who want to normalize a raw timestamp field; the SDK
-//     itself does not transform response bodies for any other field either,
-//     so this is opt-in rather than applied automatically. See ADR-017:
+//   - timestamp_variants (src/timestamps.ts's parseTimestamp(); see ADR-017:
 //     returns an ISO string, not a Date, for the 1.x line.)
 //
 // Added post-milestone-3 (PR #10 review fixes, fixture 1.0.5):
@@ -391,6 +388,62 @@ describe("Contract: behaviors — timestamp_variants", () => {
     const arraySeconds = { seconds: [1] };
     expect(() => parseTimestamp(arraySeconds)).not.toThrow();
     expect(parseTimestamp(arraySeconds)).toBe(arraySeconds);
+  });
+});
+
+describe("Contract: behaviors — timestamp_variants (wired into response parsing)", () => {
+  it("normalizes a Firestore-shaped `created` field on a real Link response to an ISO string", async () => {
+    const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
+    const firestoreCreated = { _seconds: 1756684800, _nanoseconds: 0 };
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        id: "doc123",
+        short: "abc123",
+        shortCode: "abc123",
+        fullPath: "abc123",
+        long: "https://example.com/",
+        clicks: 0,
+        created: firestoreCreated,
+        expiresAt: null,
+        maxClicks: null,
+        isCustom: false,
+      }),
+    );
+
+    const link = await client.links.get("abc123");
+
+    expect(link.created).toBe(new Date(1756684800 * 1000).toISOString());
+    expect(typeof link.created).toBe("string");
+  });
+
+  it("normalizes Firestore-shaped timestamps on links.list() results too", async () => {
+    const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
+    const firestoreExpiresAt = { seconds: 1756684800, nanoseconds: 0 };
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        links: [
+          {
+            id: "doc123",
+            short: "abc123",
+            shortCode: "abc123",
+            fullPath: "abc123",
+            long: "https://example.com/",
+            clicks: 0,
+            created: null,
+            expiresAt: firestoreExpiresAt,
+            maxClicks: null,
+            isCustom: false,
+          },
+        ],
+        pagination: { limit: 20, offset: 0, hasMore: false },
+      }),
+    );
+
+    const page = await client.links.list();
+
+    expect(page.data[0]?.expiresAt).toBe(new Date(1756684800 * 1000).toISOString());
   });
 });
 

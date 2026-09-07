@@ -34,10 +34,16 @@ exercised by a contract-fixture test). References below are to that contract's s
   `util.inspect.custom` so the raw API key never appears in `JSON.stringify`/`console.log` output.
 - **Pagination** (§7): `client.links.listAll()` async iterator — clamps `limit` to 100, stops on
   `hasMore:false` or a short/empty page.
-- **`src/timestamps.ts`**'s `parseTimestamp()` — normalizes an ISO string, `{_seconds,_nanoseconds}`,
-  or `{seconds,nanoseconds}` to an ISO string (ADR-017: string, not `Date`, for the 1.x line);
-  unrecognized shapes pass through unchanged. Exported for consumers who want to normalize a raw
-  timestamp field — the SDK does not transform response bodies automatically for any field.
+- **Automatic timestamp normalization**: every timestamp-shaped field returned by the SDK (`Link.created`/`expiresAt`,
+  `Folder.createdAt`, `Webhook.createdAt`/`updatedAt`/`lastTriggered`, `SavedView.createdAt`/`updatedAt`,
+  `CustomDomain.createdAt`, `AffiliateProgram.createdAt`, `ImportJob.createdAt`/`updatedAt`,
+  `TrustScoreResult.scannedAt`, `Web2AppSession.clickedAt`, `UsageStats.apiKeyCreatedAt` and
+  `overage.startedAt`/`expiresAt`, click-event `timestamp` fields, and `CreatedLink.expiresAt`) is now
+  parsed by `src/timestamps.ts`'s `parseTimestamp()` before being returned — an ISO string, `{_seconds,_nanoseconds}`,
+  or `{seconds,nanoseconds}` shape from the platform all normalize to a plain ISO string (ADR-017:
+  string, not `Date`, for the 1.x line); unrecognized shapes pass through unchanged, and malformed/
+  out-of-range values (e.g. non-numeric nanoseconds, absurd seconds) never throw. `parseTimestamp()`
+  itself also remains exported for anyone parsing a raw field by hand.
 - **Tooling**: ESLint (`typescript-eslint` type-checked), `npm run lint`; `.github/workflows/ci.yml`
   (lint/typecheck/test/build/pack-install smoke test, Node 18/20/22 matrix);
   `.github/workflows/contract-drift.yml` (auto-detects platform contract drift via

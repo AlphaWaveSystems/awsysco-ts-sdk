@@ -1,6 +1,11 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type { CreateSavedViewOptions, SavedView, UpdateSavedViewOptions } from "../types.js";
+
+function mapSavedView(raw: SavedView): SavedView {
+  return mapTimestampFields(raw, ["createdAt", "updatedAt"]);
+}
 
 export class SavedViewsResource {
   constructor(private readonly http: HttpClient) {}
@@ -9,7 +14,12 @@ export class SavedViewsResource {
    * List all saved views for the authenticated user.
    */
   async list(options?: RequestOptions): Promise<{ views: SavedView[] }> {
-    return this.http.get<{ views: SavedView[] }>(paths.savedViews.base, undefined, options);
+    const raw = await this.http.get<{ views: SavedView[] }>(
+      paths.savedViews.base,
+      undefined,
+      options,
+    );
+    return { views: (raw.views ?? []).map(mapSavedView) };
   }
 
   /**
@@ -21,7 +31,8 @@ export class SavedViewsResource {
     opts: CreateSavedViewOptions,
     options?: RequestOptions,
   ): Promise<SavedView> {
-    return this.http.post<SavedView>(paths.savedViews.base, opts, options);
+    const raw = await this.http.post<SavedView>(paths.savedViews.base, opts, options);
+    return mapSavedView(raw);
   }
 
   /**
@@ -35,7 +46,8 @@ export class SavedViewsResource {
     opts: UpdateSavedViewOptions,
     options?: RequestOptions,
   ): Promise<SavedView> {
-    return this.http.patch<SavedView>(paths.savedViews.byId(viewId), opts, options);
+    const raw = await this.http.patch<SavedView>(paths.savedViews.byId(viewId), opts, options);
+    return mapSavedView(raw);
   }
 
   /**

@@ -1,6 +1,11 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { mapTimestampFields } from "../timestamps.js";
 import type { CreateWebhookOptions, UpdateWebhookOptions, Webhook } from "../types.js";
+
+function mapWebhook(raw: Webhook): Webhook {
+  return mapTimestampFields(raw, ["createdAt", "updatedAt", "lastTriggered"]);
+}
 
 export class WebhooksResource {
   constructor(private readonly http: HttpClient) {}
@@ -24,11 +29,12 @@ export class WebhooksResource {
   async list(
     options?: RequestOptions,
   ): Promise<{ webhooks: Webhook[]; limit: number; used?: number }> {
-    return this.http.get<{ webhooks: Webhook[]; limit: number; used?: number }>(
+    const raw = await this.http.get<{ webhooks: Webhook[]; limit: number; used?: number }>(
       paths.webhooks.base,
       undefined,
       options,
     );
+    return { ...raw, webhooks: (raw.webhooks ?? []).map(mapWebhook) };
   }
 
   /**
@@ -37,7 +43,8 @@ export class WebhooksResource {
    * @param opts - Webhook creation options
    */
   async create(opts: CreateWebhookOptions, options?: RequestOptions): Promise<Webhook> {
-    return this.http.post<Webhook>(paths.webhooks.base, opts, options);
+    const raw = await this.http.post<Webhook>(paths.webhooks.base, opts, options);
+    return mapWebhook(raw);
   }
 
   /**
@@ -54,7 +61,12 @@ export class WebhooksResource {
     opts: UpdateWebhookOptions,
     options?: RequestOptions,
   ): Promise<Webhook> {
-    return this.http.patch<Webhook>(paths.webhooks.byIdForUpdate(webhookId), opts, options);
+    const raw = await this.http.patch<Webhook>(
+      paths.webhooks.byIdForUpdate(webhookId),
+      opts,
+      options,
+    );
+    return mapWebhook(raw);
   }
 
   /**
