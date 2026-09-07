@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { AwsysClient, AwsysForbiddenError } from "../src/index.js";
 
 const client = new AwsysClient({
-  apiKey: process.env.AWSYS_API_KEY!,
+  apiKey: process.env.AWSYS_API_KEY ?? "awsys_test_placeholder",
   baseUrl: process.env.AWSYS_BASE_URL ?? "https://staging.awsys.co",
 });
 
@@ -11,7 +11,7 @@ const client = new AwsysClient({
 // behavior and SDK correctness. The bulk endpoint is only implemented on
 // production (not staging), so these tests verify error handling.
 
-describe("Bulk", () => {
+describe.skipIf(!process.env.AWSYS_API_KEY)("Bulk", () => {
   describe("create", () => {
     it("throws ForbiddenError for Pro tier account (requires Builder+)", async () => {
       // The staging endpoint returns 404 HTML since bulk isn't implemented on staging.

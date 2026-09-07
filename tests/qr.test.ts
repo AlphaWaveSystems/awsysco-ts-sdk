@@ -3,8 +3,10 @@ import { AwsysClient } from "../src/index.js";
 
 const BASE_URL = process.env.AWSYS_BASE_URL ?? "https://staging.awsys.co";
 
+// getUrl() is a local, network-free URL builder — no API key is ever sent,
+// so a placeholder is fine when AWSYS_API_KEY isn't set.
 const client = new AwsysClient({
-  apiKey: process.env.AWSYS_API_KEY!,
+  apiKey: process.env.AWSYS_API_KEY ?? "awsys_test_placeholder",
   baseUrl: BASE_URL,
 });
 
