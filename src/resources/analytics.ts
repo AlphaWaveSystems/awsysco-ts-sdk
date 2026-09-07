@@ -52,13 +52,19 @@ export class AnalyticsResource {
    * Requires the "Live Globe" feature flag to be enabled on the account —
    * throws {@link AwsysForbiddenError} with `code: "FEATURE_DISABLED"` otherwise.
    *
-   * @param opts.limit - Maximum number of recent click events to return
-   * @param opts.since - ISO 8601 timestamp; only return clicks after this time
+   * @param limitOrOpts - Either a bare `limit` number (legacy call style, kept
+   *   for backward compatibility per ADR-014) or an options object.
+   * @param limitOrOpts.limit - Maximum number of recent click events to return
+   * @param limitOrOpts.since - ISO 8601 timestamp; only return clicks after this time
    */
-  async getRecentClicks(opts?: GetRecentClicksOptions): Promise<RecentClicksResult> {
+  async getRecentClicks(
+    limitOrOpts?: number | GetRecentClicksOptions,
+  ): Promise<RecentClicksResult> {
+    const opts: GetRecentClicksOptions =
+      typeof limitOrOpts === "number" ? { limit: limitOrOpts } : (limitOrOpts ?? {});
     const params: Record<string, string | number> = {};
-    if (opts?.limit !== undefined) params.limit = opts.limit;
-    if (opts?.since !== undefined) params.since = opts.since;
+    if (opts.limit !== undefined) params.limit = opts.limit;
+    if (opts.since !== undefined) params.since = opts.since;
     return this.http.get<RecentClicksResult>(paths.analytics.recentClicks, params);
   }
 }
