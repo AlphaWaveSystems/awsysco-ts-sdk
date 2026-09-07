@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 
 export class DataExportResource {
@@ -9,8 +9,8 @@ export class DataExportResource {
    *
    * @returns Raw CSV text
    */
-  async exportLinks(): Promise<string> {
-    return this.http.getText(paths.dataExport.links);
+  async exportLinks(options?: RequestOptions): Promise<string> {
+    return this.http.getText(paths.dataExport.links, undefined, options);
   }
 
   /**
@@ -19,7 +19,7 @@ export class DataExportResource {
    * @param shortPath - The short code or namespaced path
    * @returns Raw CSV text
    */
-  async exportLinkStats(shortPath: string): Promise<string> {
-    return this.http.getText(paths.dataExport.linkStats(shortPath));
+  async exportLinkStats(shortPath: string, options?: RequestOptions): Promise<string> {
+    return this.http.getText(paths.dataExport.linkStats(shortPath), undefined, options);
   }
 }

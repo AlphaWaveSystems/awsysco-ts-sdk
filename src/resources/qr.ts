@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import type { QRCodeOptions, QRSettings } from "../types.js";
 
 export class QRResource {
@@ -42,9 +42,11 @@ export class QRResource {
    *
    * @param shortPath - The short code or namespaced path
    */
-  async getSettings(shortPath: string): Promise<QRSettings> {
+  async getSettings(shortPath: string, options?: RequestOptions): Promise<QRSettings> {
     return this.http.get<QRSettings>(
       `/api/link/${encodeURIComponent(shortPath)}/qr-settings`,
+      undefined,
+      options,
     );
   }
 
@@ -54,10 +56,15 @@ export class QRResource {
    * @param shortPath - The short code or namespaced path
    * @param settings - The QR settings to apply
    */
-  async updateSettings(shortPath: string, settings: QRSettings): Promise<QRSettings> {
+  async updateSettings(
+    shortPath: string,
+    settings: QRSettings,
+    options?: RequestOptions,
+  ): Promise<QRSettings> {
     return this.http.put<QRSettings>(
       `/api/link/${encodeURIComponent(shortPath)}/qr-settings`,
       settings,
+      options,
     );
   }
 }

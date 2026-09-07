@@ -36,7 +36,7 @@ describe("UtmTemplatesResource", () => {
 
       const result = await utmTemplates.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/me");
+      expect(http.get).toHaveBeenCalledWith("/api/v1/me", undefined, undefined);
       expect(result).toEqual([
         { ...rawTemplates[0], source: "email", medium: "newsletter", campaign: "summer" },
       ]);
@@ -58,12 +58,16 @@ describe("UtmTemplatesResource", () => {
 
       const result = await utmTemplates.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", {
-        name: "Launch",
-        utmSource: "twitter",
-        utmMedium: "social",
-        utmCampaign: "launch",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/utm-templates",
+        {
+          name: "Launch",
+          utmSource: "twitter",
+          utmMedium: "social",
+          utmCampaign: "launch",
+        },
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
 
@@ -78,12 +82,16 @@ describe("UtmTemplatesResource", () => {
         utmCampaign: "launch",
       });
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", {
-        name: "Launch",
-        utmSource: "twitter",
-        utmMedium: "social",
-        utmCampaign: "launch",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/utm-templates",
+        {
+          name: "Launch",
+          utmSource: "twitter",
+          utmMedium: "social",
+          utmCampaign: "launch",
+        },
+        undefined,
+      );
     });
 
     it("includes optional term and content fields when provided", async () => {
@@ -99,14 +107,18 @@ describe("UtmTemplatesResource", () => {
 
       await utmTemplates.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", {
-        name: "Detailed",
-        utmSource: "google",
-        utmMedium: "cpc",
-        utmCampaign: "brand",
-        term: "url shortener",
-        content: "ad-variant-b",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/utm-templates",
+        {
+          name: "Detailed",
+          utmSource: "google",
+          utmMedium: "cpc",
+          utmCampaign: "brand",
+          term: "url shortener",
+          content: "ad-variant-b",
+        },
+        undefined,
+      );
     });
   });
 
@@ -116,7 +128,7 @@ describe("UtmTemplatesResource", () => {
 
       const result = await utmTemplates.delete("t1");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/user/utm-templates/t1");
+      expect(http.delete).toHaveBeenCalledWith("/api/user/utm-templates/t1", undefined);
       expect(result).toEqual({ success: true });
     });
   });

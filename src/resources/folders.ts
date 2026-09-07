@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import type { CreateFolderOptions, Folder, UpdateFolderOptions } from "../types.js";
 
@@ -13,16 +13,20 @@ export class FoldersResource {
   /**
    * List all folders for the authenticated user.
    */
-  async list(): Promise<Folder[]> {
-    const raw = await this.http.get<RawFoldersResponse>(paths.folders.base);
+  async list(options?: RequestOptions): Promise<Folder[]> {
+    const raw = await this.http.get<RawFoldersResponse>(
+      paths.folders.base,
+      undefined,
+      options,
+    );
     return raw.folders ?? raw.data ?? [];
   }
 
   /**
    * Create a new folder.
    */
-  async create(opts: CreateFolderOptions): Promise<Folder> {
-    return this.http.post<Folder>(paths.folders.base, opts);
+  async create(opts: CreateFolderOptions, options?: RequestOptions): Promise<Folder> {
+    return this.http.post<Folder>(paths.folders.base, opts, options);
   }
 
   /**
@@ -31,28 +35,36 @@ export class FoldersResource {
    * @param folderId - The ID of the folder to update
    * @param opts - Fields to update
    */
-  async update(folderId: string, opts: UpdateFolderOptions): Promise<Folder> {
-    return this.http.patch<Folder>(paths.folders.byIdForUpdate(folderId), opts);
+  async update(
+    folderId: string,
+    opts: UpdateFolderOptions,
+    options?: RequestOptions,
+  ): Promise<Folder> {
+    return this.http.patch<Folder>(paths.folders.byIdForUpdate(folderId), opts, options);
   }
 
   /**
    * Delete a folder by ID.
    */
-  async delete(folderId: string): Promise<void> {
-    return this.http.delete<void>(paths.folders.byId(folderId));
+  async delete(folderId: string, options?: RequestOptions): Promise<void> {
+    return this.http.delete<void>(paths.folders.byId(folderId), options);
   }
 
   /**
    * Assign a link to a folder.
    */
-  async assignLink(shortPath: string, folderId: string): Promise<void> {
-    return this.http.post<void>(paths.links.folder(shortPath), { folderId });
+  async assignLink(
+    shortPath: string,
+    folderId: string,
+    options?: RequestOptions,
+  ): Promise<void> {
+    return this.http.post<void>(paths.links.folder(shortPath), { folderId }, options);
   }
 
   /**
    * Remove a link from its current folder.
    */
-  async removeLink(shortPath: string): Promise<void> {
-    return this.http.post<void>(paths.links.folder(shortPath), { folderId: null });
+  async removeLink(shortPath: string, options?: RequestOptions): Promise<void> {
+    return this.http.post<void>(paths.links.folder(shortPath), { folderId: null }, options);
   }
 }

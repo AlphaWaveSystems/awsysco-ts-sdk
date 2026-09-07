@@ -40,7 +40,7 @@ describe("CustomDomainsResource", () => {
 
       const result = await customDomains.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/user/domains");
+      expect(http.get).toHaveBeenCalledWith("/api/user/domains", undefined, undefined);
       expect(result.domains).toHaveLength(1);
     });
   });
@@ -58,7 +58,11 @@ describe("CustomDomainsResource", () => {
 
       const result = await customDomains.add("links.example.com");
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/domains", { domain: "links.example.com" });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/domains",
+        { domain: "links.example.com" },
+        undefined,
+      );
       expect(result.verificationToken).toBe("verify-abc");
     });
   });
@@ -72,6 +76,8 @@ describe("CustomDomainsResource", () => {
 
       expect(http.get).toHaveBeenCalledWith(
         "/api/user/domains/links.example.com/verify",
+        undefined,
+        undefined,
       );
       expect(result.verified).toBe(true);
     });
@@ -119,6 +125,7 @@ describe("CustomDomainsResource", () => {
       expect(http.patch).toHaveBeenCalledWith(
         "/api/user/domains/links.example.com",
         { isDefault: true },
+        undefined,
       );
       expect(result.isDefault).toBe(true);
     });
@@ -132,6 +139,7 @@ describe("CustomDomainsResource", () => {
 
       expect(http.delete).toHaveBeenCalledWith(
         "/api/user/domains/links.example.com",
+        undefined,
       );
       expect(result).toEqual({ success: true });
     });
@@ -146,6 +154,8 @@ describe("CustomDomainsResource", () => {
 
       expect(http.get).toHaveBeenCalledWith(
         "/api/domains/check/links.newdomain.com",
+        undefined,
+        undefined,
       );
       expect(result.available).toBe(true);
     });

@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import type { TrustScoreResult } from "../types.js";
 
@@ -35,9 +35,11 @@ export class TrustScoreResource {
    *
    * @param shortPath - The short code or namespaced path to scan
    */
-  async scan(shortPath: string): Promise<TrustScoreResult> {
+  async scan(shortPath: string, options?: RequestOptions): Promise<TrustScoreResult> {
     const raw = await this.http.get<RawTrustScoreResult>(
       paths.trustScore.scan(shortPath),
+      undefined,
+      options,
     );
     return mapTrustScoreResult(raw);
   }

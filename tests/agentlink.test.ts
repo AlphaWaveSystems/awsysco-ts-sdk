@@ -39,9 +39,11 @@ describe("AgentlinkResource", () => {
 
       const result = await agentlink.subscribe("user@example.com");
 
-      expect(http.post).toHaveBeenCalledWith("/api/agentlink/subscribe", {
-        email: "user@example.com",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/agentlink/subscribe",
+        { email: "user@example.com" },
+        undefined,
+      );
       expect(result).toEqual({ success: true });
     });
   });
@@ -55,6 +57,7 @@ describe("AgentlinkResource", () => {
       expect(http.get).toHaveBeenCalledWith(
         "/api/agentlink/links/abc123/stats",
         {},
+        undefined,
       );
       expect(result.totalAgentClicks).toBe(42);
     });
@@ -67,6 +70,7 @@ describe("AgentlinkResource", () => {
       expect(http.get).toHaveBeenCalledWith(
         "/api/agentlink/links/abc123/stats",
         { period: 14 },
+        undefined,
       );
     });
 
@@ -78,6 +82,7 @@ describe("AgentlinkResource", () => {
       expect(http.get).toHaveBeenCalledWith(
         "/api/agentlink/links/ns%2Fslug/stats",
         {},
+        undefined,
       );
     });
   });
@@ -88,7 +93,7 @@ describe("AgentlinkResource", () => {
 
       const result = await agentlink.getAccountStats();
 
-      expect(http.get).toHaveBeenCalledWith("/api/agentlink/account/stats", {});
+      expect(http.get).toHaveBeenCalledWith("/api/agentlink/account/stats", {}, undefined);
       expect(result.periodDays).toBe(7);
     });
 
@@ -97,9 +102,11 @@ describe("AgentlinkResource", () => {
 
       await agentlink.getAccountStats(30);
 
-      expect(http.get).toHaveBeenCalledWith("/api/agentlink/account/stats", {
-        period: 30,
-      });
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/agentlink/account/stats",
+        { period: 30 },
+        undefined,
+      );
     });
   });
 });

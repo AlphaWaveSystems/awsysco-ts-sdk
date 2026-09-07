@@ -135,6 +135,16 @@ function throwForStatus(
   }
 }
 
+/**
+ * Per-call override for the request timeout and/or an external abort
+ * signal, accepted by every resource method (contract §3: per-call
+ * override alongside the client-level default).
+ */
+export interface RequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
 export class HttpClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -310,11 +320,9 @@ export class HttpClient {
   async request<T>(
     method: string,
     path: string,
-    options?: {
+    options?: RequestOptions & {
       body?: unknown;
       params?: Record<string, string | number>;
-      signal?: AbortSignal;
-      timeoutMs?: number;
     },
   ): Promise<T> {
     const url = this.buildUrl(path, options?.params);
@@ -340,7 +348,7 @@ export class HttpClient {
   get<T>(
     path: string,
     params?: Record<string, string | number>,
-    options?: { signal?: AbortSignal; timeoutMs?: number },
+    options?: RequestOptions,
   ): Promise<T> {
     return this.request<T>("GET", path, { params, ...options });
   }
@@ -348,7 +356,7 @@ export class HttpClient {
   post<T>(
     path: string,
     body?: unknown,
-    options?: { signal?: AbortSignal; timeoutMs?: number },
+    options?: RequestOptions,
   ): Promise<T> {
     return this.request<T>("POST", path, { body, ...options });
   }
@@ -356,14 +364,14 @@ export class HttpClient {
   patch<T>(
     path: string,
     body?: unknown,
-    options?: { signal?: AbortSignal; timeoutMs?: number },
+    options?: RequestOptions,
   ): Promise<T> {
     return this.request<T>("PATCH", path, { body, ...options });
   }
 
   delete<T>(
     path: string,
-    options?: { signal?: AbortSignal; timeoutMs?: number },
+    options?: RequestOptions,
   ): Promise<T> {
     return this.request<T>("DELETE", path, options);
   }
@@ -371,7 +379,7 @@ export class HttpClient {
   async getText(
     path: string,
     params?: Record<string, string | number>,
-    options?: { signal?: AbortSignal; timeoutMs?: number },
+    options?: RequestOptions,
   ): Promise<string> {
     const url = this.buildUrl(path, params);
     const headers: Record<string, string> = {
@@ -395,7 +403,7 @@ export class HttpClient {
   put<T>(
     path: string,
     body?: unknown,
-    options?: { signal?: AbortSignal; timeoutMs?: number },
+    options?: RequestOptions,
   ): Promise<T> {
     return this.request<T>("PUT", path, { body, ...options });
   }

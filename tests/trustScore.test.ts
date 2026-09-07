@@ -40,7 +40,7 @@ describe("TrustScoreResource", () => {
 
       const result = await trustScore.scan("abc123");
 
-      expect(http.get).toHaveBeenCalledWith("/api/link-scan/abc123");
+      expect(http.get).toHaveBeenCalledWith("/api/link-scan/abc123", undefined, undefined);
       expect(result).toEqual({
         ...raw,
         short: "abc123",
@@ -76,7 +76,7 @@ describe("TrustScoreResource", () => {
 
       await trustScore.scan("ns/slug");
 
-      expect(http.get).toHaveBeenCalledWith("/api/link-scan/ns%2Fslug");
+      expect(http.get).toHaveBeenCalledWith("/api/link-scan/ns%2Fslug", undefined, undefined);
     });
   });
 });

@@ -34,6 +34,7 @@ describe("TagsResource", () => {
       expect(http.post).toHaveBeenCalledWith(
         "/api/link/abc123/tags",
         { tags: ["social"] },
+        undefined,
       );
       expect(result).toEqual(expected);
     });
@@ -47,6 +48,7 @@ describe("TagsResource", () => {
       expect(http.post).toHaveBeenCalledWith(
         "/api/link/abc123/tags",
         { tags: ["a", "b"] },
+        undefined,
       );
     });
 
@@ -58,6 +60,7 @@ describe("TagsResource", () => {
       expect(http.post).toHaveBeenCalledWith(
         "/api/link/ns%2Fslug/tags",
         { tags: ["x"] },
+        undefined,
       );
     });
   });
@@ -69,9 +72,7 @@ describe("TagsResource", () => {
 
       const result = await tags.remove("abc123", "social");
 
-      expect(http.delete).toHaveBeenCalledWith(
-        "/api/link/abc123/tags/social",
-      );
+      expect(http.delete).toHaveBeenCalledWith("/api/link/abc123/tags/social", undefined);
       expect(result).toEqual(expected);
     });
 
@@ -80,9 +81,7 @@ describe("TagsResource", () => {
 
       await tags.remove("abc123", "my tag");
 
-      expect(http.delete).toHaveBeenCalledWith(
-        "/api/link/abc123/tags/my%20tag",
-      );
+      expect(http.delete).toHaveBeenCalledWith("/api/link/abc123/tags/my%20tag", undefined);
     });
   });
 });

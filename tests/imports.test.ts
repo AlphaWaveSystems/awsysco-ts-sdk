@@ -57,12 +57,16 @@ describe("ImportsResource", () => {
         scanOnly: true,
       });
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
-        provider: "bitly",
-        accessToken: "tok_secret",
-        targetNamespace: "acme",
-        scanOnly: true,
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {
+          provider: "bitly",
+          accessToken: "tok_secret",
+          targetNamespace: "acme",
+          scanOnly: true,
+        },
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
 
@@ -71,10 +75,14 @@ describe("ImportsResource", () => {
 
       await imports.start({ provider: "bitly", accessToken: "tok" });
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
-        provider: "bitly",
-        accessToken: "tok",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {
+          provider: "bitly",
+          accessToken: "tok",
+        },
+        undefined,
+      );
     });
 
     it("forwards scanOnly: false explicitly when set", async () => {
@@ -86,11 +94,15 @@ describe("ImportsResource", () => {
         scanOnly: false,
       });
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
-        provider: "bitly",
-        accessToken: "tok",
-        scanOnly: false,
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {
+          provider: "bitly",
+          accessToken: "tok",
+          scanOnly: false,
+        },
+        undefined,
+      );
     });
   });
 
@@ -101,7 +113,7 @@ describe("ImportsResource", () => {
 
       const result = await imports.getStatus("imp_123");
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports/imp_123");
+      expect(http.get).toHaveBeenCalledWith("/api/v1/imports/imp_123", undefined, undefined);
       expect(result).toEqual(expected);
     });
 
@@ -110,7 +122,11 @@ describe("ImportsResource", () => {
 
       await imports.getStatus("imp/abc 1");
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports/imp%2Fabc%201");
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports/imp%2Fabc%201",
+        undefined,
+        undefined,
+      );
     });
   });
 
@@ -121,7 +137,7 @@ describe("ImportsResource", () => {
 
       const result = await imports.cancel("imp_123");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/v1/imports/imp_123");
+      expect(http.delete).toHaveBeenCalledWith("/api/v1/imports/imp_123", undefined);
       expect(result.status).toBe("cancelled");
     });
   });
@@ -133,7 +149,11 @@ describe("ImportsResource", () => {
 
       const result = await imports.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports", {});
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {},
+        { signal: undefined, timeoutMs: undefined },
+      );
       expect(result).toEqual(jobs);
     });
 
@@ -142,7 +162,11 @@ describe("ImportsResource", () => {
 
       await imports.list({ limit: 5 });
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports", { limit: 5 });
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        { limit: 5 },
+        { signal: undefined, timeoutMs: undefined },
+      );
     });
   });
 
@@ -198,6 +222,8 @@ describe("ImportsResource", () => {
 
       expect(http.getText).toHaveBeenCalledWith(
         "/api/v1/imports/imp_123/redirect-map.csv",
+        undefined,
+        undefined,
       );
       expect(result).toBe(csv);
     });
@@ -214,6 +240,8 @@ describe("ImportsResource", () => {
 
       expect(http.get).toHaveBeenCalledWith(
         "/api/v1/imports/imp_123/redirect-map.json",
+        undefined,
+        undefined,
       );
       expect(result).toEqual(expected);
     });

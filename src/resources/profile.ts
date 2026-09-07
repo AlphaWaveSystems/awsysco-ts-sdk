@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import type { UpdateProfileOptions, UserProfile } from "../types.js";
 
@@ -13,14 +13,17 @@ export class ProfileResource {
   /**
    * Get the authenticated user's profile.
    */
-  async get(): Promise<UserProfile> {
-    return this.http.get<UserProfile>(paths.profile.base);
+  async get(options?: RequestOptions): Promise<UserProfile> {
+    return this.http.get<UserProfile>(paths.profile.base, undefined, options);
   }
 
   /**
    * Update the authenticated user's profile.
    */
-  async update(opts: UpdateProfileOptions): Promise<UserProfile> {
-    return this.http.patch<UserProfile>(paths.profile.base, opts);
+  async update(
+    opts: UpdateProfileOptions,
+    options?: RequestOptions,
+  ): Promise<UserProfile> {
+    return this.http.patch<UserProfile>(paths.profile.base, opts, options);
   }
 }

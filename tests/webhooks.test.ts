@@ -46,7 +46,7 @@ describe("WebhooksResource", () => {
 
       const result = await webhooks.listEventTypes();
 
-      expect(http.get).toHaveBeenCalledWith("/api/webhooks/event-types");
+      expect(http.get).toHaveBeenCalledWith("/api/webhooks/event-types", undefined, undefined);
       expect(result).toEqual(expected);
     });
   });
@@ -58,7 +58,7 @@ describe("WebhooksResource", () => {
 
       const result = await webhooks.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/webhooks");
+      expect(http.get).toHaveBeenCalledWith("/api/v1/webhooks", undefined, undefined);
       expect(result.webhooks).toHaveLength(1);
       expect(result.limit).toBe(10);
     });
@@ -75,7 +75,7 @@ describe("WebhooksResource", () => {
 
       const result = await webhooks.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks", opts, undefined);
       expect(result.id).toBe("wh1");
     });
 
@@ -89,7 +89,7 @@ describe("WebhooksResource", () => {
 
       await webhooks.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks", opts, undefined);
     });
   });
 
@@ -100,7 +100,11 @@ describe("WebhooksResource", () => {
 
       const result = await webhooks.update("wh1", { enabled: false });
 
-      expect(http.patch).toHaveBeenCalledWith("/api/webhooks/wh1", { enabled: false });
+      expect(http.patch).toHaveBeenCalledWith(
+        "/api/webhooks/wh1",
+        { enabled: false },
+        undefined,
+      );
       expect(result.enabled).toBe(false);
     });
   });
@@ -111,7 +115,7 @@ describe("WebhooksResource", () => {
 
       const result = await webhooks.delete("wh1");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/v1/webhooks/wh1");
+      expect(http.delete).toHaveBeenCalledWith("/api/v1/webhooks/wh1", undefined);
       expect(result).toEqual({ success: true });
     });
   });
@@ -123,9 +127,11 @@ describe("WebhooksResource", () => {
 
       const result = await webhooks.test("wh1", "link.created");
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/webhooks/wh1/test", {
-        eventType: "link.created",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/v1/webhooks/wh1/test",
+        { eventType: "link.created" },
+        undefined,
+      );
       expect(result.statusCode).toBe(200);
     });
   });

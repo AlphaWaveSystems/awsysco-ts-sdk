@@ -31,7 +31,7 @@ describe("DataExportResource", () => {
 
       const result = await dataExport.exportLinks();
 
-      expect(http.getText).toHaveBeenCalledWith("/api/export/links");
+      expect(http.getText).toHaveBeenCalledWith("/api/export/links", undefined, undefined);
       expect(result).toBe(csv);
     });
 
@@ -52,6 +52,8 @@ describe("DataExportResource", () => {
 
       expect(http.getText).toHaveBeenCalledWith(
         "/api/export/stats/abc123",
+        undefined,
+        undefined,
       );
       expect(result).toBe(csv);
     });
@@ -61,7 +63,11 @@ describe("DataExportResource", () => {
 
       await dataExport.exportLinkStats("ns/slug");
 
-      expect(http.getText).toHaveBeenCalledWith("/api/export/stats/ns%2Fslug");
+      expect(http.getText).toHaveBeenCalledWith(
+        "/api/export/stats/ns%2Fslug",
+        undefined,
+        undefined,
+      );
     });
   });
 });

@@ -1,5 +1,5 @@
 import { AwsysForbiddenError } from "../errors.js";
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import type { AddDomainResult, CustomDomain } from "../types.js";
 
@@ -11,9 +11,13 @@ export class CustomDomainsResource {
   /**
    * List all custom domains for the authenticated user.
    */
-  async list(): Promise<{ domains: CustomDomain[]; monthlyPrice?: number }> {
+  async list(
+    options?: RequestOptions,
+  ): Promise<{ domains: CustomDomain[]; monthlyPrice?: number }> {
     return this.http.get<{ domains: CustomDomain[]; monthlyPrice?: number }>(
       paths.customDomains.base,
+      undefined,
+      options,
     );
   }
 
@@ -22,8 +26,8 @@ export class CustomDomainsResource {
    *
    * @param domain - The domain to add (e.g. "links.example.com")
    */
-  async add(domain: string): Promise<AddDomainResult> {
-    return this.http.post<AddDomainResult>(paths.customDomains.base, { domain });
+  async add(domain: string, options?: RequestOptions): Promise<AddDomainResult> {
+    return this.http.post<AddDomainResult>(paths.customDomains.base, { domain }, options);
   }
 
   /**
@@ -31,9 +35,14 @@ export class CustomDomainsResource {
    *
    * @param domain - The domain to verify
    */
-  async verify(domain: string): Promise<{ verified: boolean; domain: string; status: string }> {
+  async verify(
+    domain: string,
+    options?: RequestOptions,
+  ): Promise<{ verified: boolean; domain: string; status: string }> {
     return this.http.get<{ verified: boolean; domain: string; status: string }>(
       paths.customDomains.verify(domain),
+      undefined,
+      options,
     );
   }
 
@@ -73,8 +82,9 @@ export class CustomDomainsResource {
   async update(
     domain: string,
     opts: { isDefault?: boolean; notFoundHtml?: string; defaultRedirect?: string },
+    options?: RequestOptions,
   ): Promise<CustomDomain> {
-    return this.http.patch<CustomDomain>(paths.customDomains.byDomain(domain), opts);
+    return this.http.patch<CustomDomain>(paths.customDomains.byDomain(domain), opts, options);
   }
 
   /**
@@ -82,8 +92,8 @@ export class CustomDomainsResource {
    *
    * @param domain - The domain to remove
    */
-  async remove(domain: string): Promise<{ success: boolean }> {
-    return this.http.delete<{ success: boolean }>(paths.customDomains.byDomain(domain));
+  async remove(domain: string, options?: RequestOptions): Promise<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(paths.customDomains.byDomain(domain), options);
   }
 
   /**
@@ -91,9 +101,14 @@ export class CustomDomainsResource {
    *
    * @param hostname - The hostname to check
    */
-  async check(hostname: string): Promise<{ available: boolean; reason?: string }> {
+  async check(
+    hostname: string,
+    options?: RequestOptions,
+  ): Promise<{ available: boolean; reason?: string }> {
     return this.http.get<{ available: boolean; reason?: string }>(
       paths.customDomains.check(hostname),
+      undefined,
+      options,
     );
   }
 }

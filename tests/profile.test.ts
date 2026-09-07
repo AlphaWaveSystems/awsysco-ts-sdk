@@ -36,7 +36,7 @@ describe("ProfileResource", () => {
 
       const result = await profile.get();
 
-      expect(http.get).toHaveBeenCalledWith("/api/user/profile");
+      expect(http.get).toHaveBeenCalledWith("/api/user/profile", undefined, undefined);
       expect(result).toEqual(expected);
     });
   });
@@ -50,9 +50,11 @@ describe("ProfileResource", () => {
 
       const result = await profile.update({ displayName: "New" });
 
-      expect(http.patch).toHaveBeenCalledWith("/api/user/profile", {
-        displayName: "New",
-      });
+      expect(http.patch).toHaveBeenCalledWith(
+        "/api/user/profile",
+        { displayName: "New" },
+        undefined,
+      );
       expect(result).toEqual({ success: true, displayName: "New" });
     });
   });

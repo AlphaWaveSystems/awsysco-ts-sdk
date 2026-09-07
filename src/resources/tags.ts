@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import type { TagsResult } from "../types.js";
 
@@ -15,9 +15,13 @@ export class TagsResource {
    * @param shortPath - The short code or namespaced path
    * @param tags - A single tag or an array of tags to add
    */
-  async add(shortPath: string, tags: string | string[]): Promise<TagsResult> {
+  async add(
+    shortPath: string,
+    tags: string | string[],
+    options?: RequestOptions,
+  ): Promise<TagsResult> {
     const tagList = Array.isArray(tags) ? tags : [tags];
-    return this.http.post<TagsResult>(paths.tags.forLink(shortPath), { tags: tagList });
+    return this.http.post<TagsResult>(paths.tags.forLink(shortPath), { tags: tagList }, options);
   }
 
   /**
@@ -26,7 +30,11 @@ export class TagsResource {
    * @param shortPath - The short code or namespaced path
    * @param tag - The tag to remove
    */
-  async remove(shortPath: string, tag: string): Promise<TagsResult> {
-    return this.http.delete<TagsResult>(paths.tags.byTag(shortPath, tag));
+  async remove(
+    shortPath: string,
+    tag: string,
+    options?: RequestOptions,
+  ): Promise<TagsResult> {
+    return this.http.delete<TagsResult>(paths.tags.byTag(shortPath, tag), options);
   }
 }

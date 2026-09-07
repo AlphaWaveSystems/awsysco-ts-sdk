@@ -116,6 +116,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
     expect(http.get).toHaveBeenCalledWith(
       "/api/v1/links/abc123/stats/aggregate",
       { period: "30d" },
+      { signal: undefined, timeoutMs: undefined },
     );
     expect(result).toEqual(expected);
     expect(result.deviceBreakdown).toEqual({ mobile: 200, desktop: 300, tablet: 40 });
@@ -140,6 +141,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
     expect(http.get).toHaveBeenCalledWith(
       "/api/v1/links/abc123/stats/aggregate",
       {},
+      { signal: undefined, timeoutMs: undefined },
     );
   });
 
@@ -163,6 +165,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
     expect(http.get).toHaveBeenCalledWith(
       "/api/v1/links/ns/slug/stats/aggregate",
       { period: "7d" },
+      { signal: undefined, timeoutMs: undefined },
     );
   });
 

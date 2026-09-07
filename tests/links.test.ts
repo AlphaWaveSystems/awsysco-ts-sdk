@@ -156,10 +156,14 @@ describe("LinksResource — expireFallbackUrl passthrough (mock)", () => {
     });
 
     // Verify the HTTP client was called with expireFallbackUrl in the body
-    expect(http.post).toHaveBeenCalledWith("/api/v1/links", {
-      url: "https://example.com/page",
-      expireFallbackUrl: "https://example.com/fallback",
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/api/v1/links",
+      {
+        url: "https://example.com/page",
+        expireFallbackUrl: "https://example.com/fallback",
+      },
+      undefined,
+    );
 
     // Verify the field is present in the returned result
     expect(result.expireFallbackUrl).toBe("https://example.com/fallback");

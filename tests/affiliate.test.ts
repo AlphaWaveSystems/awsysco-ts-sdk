@@ -53,7 +53,7 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.createProgram(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/affiliate/programs", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/affiliate/programs", opts, undefined);
       expect(result.id).toBe("prog1");
     });
   });
@@ -64,7 +64,7 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.listPrograms();
 
-      expect(http.get).toHaveBeenCalledWith("/api/affiliate/programs");
+      expect(http.get).toHaveBeenCalledWith("/api/affiliate/programs", undefined, undefined);
       expect(result).toHaveLength(1);
     });
   });
@@ -75,7 +75,11 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.getProgram("prog1");
 
-      expect(http.get).toHaveBeenCalledWith("/api/affiliate/programs/prog1");
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/affiliate/programs/prog1",
+        undefined,
+        undefined,
+      );
       expect(result.name).toBe("My Affiliate Program");
     });
   });
@@ -87,7 +91,11 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.updateProgram("prog1", { cpcRate: 0.10 });
 
-      expect(http.patch).toHaveBeenCalledWith("/api/affiliate/programs/prog1", { cpcRate: 0.10 });
+      expect(http.patch).toHaveBeenCalledWith(
+        "/api/affiliate/programs/prog1",
+        { cpcRate: 0.10 },
+        undefined,
+      );
       expect(result.cpcRate).toBe(0.10);
     });
   });
@@ -102,6 +110,7 @@ describe("AffiliateResource", () => {
       expect(http.get).toHaveBeenCalledWith(
         "/api/affiliate/programs/prog1/stats",
         {},
+        undefined,
       );
       expect(result).toEqual(stats);
     });
@@ -114,6 +123,7 @@ describe("AffiliateResource", () => {
       expect(http.get).toHaveBeenCalledWith(
         "/api/affiliate/programs/prog1/stats",
         { period: "30d" },
+        undefined,
       );
     });
   });
@@ -129,6 +139,8 @@ describe("AffiliateResource", () => {
 
       expect(http.get).toHaveBeenCalledWith(
         "/api/affiliate/programs/prog1/partners",
+        undefined,
+        undefined,
       );
       expect(result).toHaveLength(1);
     });
@@ -144,6 +156,7 @@ describe("AffiliateResource", () => {
       expect(http.patch).toHaveBeenCalledWith(
         "/api/affiliate/programs/prog1/partners/p1",
         { status: "rejected" },
+        undefined,
       );
       expect(result.status).toBe("rejected");
     });
@@ -155,7 +168,7 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.discover();
 
-      expect(http.get).toHaveBeenCalledWith("/api/affiliate/discover", {});
+      expect(http.get).toHaveBeenCalledWith("/api/affiliate/discover", {}, undefined);
       expect(result).toHaveLength(1);
     });
 
@@ -164,7 +177,11 @@ describe("AffiliateResource", () => {
 
       await affiliate.discover(10);
 
-      expect(http.get).toHaveBeenCalledWith("/api/affiliate/discover", { limit: 10 });
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/affiliate/discover",
+        { limit: 10 },
+        undefined,
+      );
     });
   });
 
@@ -174,7 +191,7 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.join("prog1");
 
-      expect(http.post).toHaveBeenCalledWith("/api/affiliate/join/prog1", {});
+      expect(http.post).toHaveBeenCalledWith("/api/affiliate/join/prog1", {}, undefined);
       expect(result.id).toBe("part1");
     });
 
@@ -183,9 +200,11 @@ describe("AffiliateResource", () => {
 
       await affiliate.join("prog1", "MYCODE");
 
-      expect(http.post).toHaveBeenCalledWith("/api/affiliate/join/prog1", {
-        partnerCode: "MYCODE",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/affiliate/join/prog1",
+        { partnerCode: "MYCODE" },
+        undefined,
+      );
     });
   });
 
@@ -195,7 +214,7 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.listPartnerships();
 
-      expect(http.get).toHaveBeenCalledWith("/api/affiliate/partnerships");
+      expect(http.get).toHaveBeenCalledWith("/api/affiliate/partnerships", undefined, undefined);
       expect(result).toHaveLength(1);
     });
   });
@@ -210,6 +229,7 @@ describe("AffiliateResource", () => {
       expect(http.get).toHaveBeenCalledWith(
         "/api/affiliate/partnerships/part1/stats",
         {},
+        undefined,
       );
     });
   });
@@ -220,7 +240,7 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.leaveProgram("part1");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/affiliate/partnerships/part1");
+      expect(http.delete).toHaveBeenCalledWith("/api/affiliate/partnerships/part1", undefined);
       expect(result).toEqual({ success: true });
     });
   });
@@ -236,7 +256,7 @@ describe("AffiliateResource", () => {
 
       const result = await affiliate.getLimits();
 
-      expect(http.get).toHaveBeenCalledWith("/api/affiliate/limits");
+      expect(http.get).toHaveBeenCalledWith("/api/affiliate/limits", undefined, undefined);
       expect(result.tier).toBe("pro");
     });
   });

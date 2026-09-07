@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import type {
   AggregateAnalytics,
@@ -17,10 +17,14 @@ export class AnalyticsResource {
    * @param period - Optional time period (e.g. "7d", "30d"). Defaults to all time.
    * @returns Link statistics including total clicks and click history
    */
-  async getStats(shortPath: string, period?: string): Promise<LinkStats> {
+  async getStats(
+    shortPath: string,
+    period?: string,
+    options?: RequestOptions,
+  ): Promise<LinkStats> {
     const params: Record<string, string | number> = {};
     if (period !== undefined) params.period = period;
-    return this.http.get<LinkStats>(paths.links.stats(shortPath), params);
+    return this.http.get<LinkStats>(paths.links.stats(shortPath), params, options);
   }
 
   /**
@@ -31,19 +35,20 @@ export class AnalyticsResource {
    * breakdowns depending on the plan.
    *
    * @param shortPath - The short code or namespaced path (e.g. "abc123" or "ns/slug")
-   * @param period - Optional window: "7d" (default), "30d", or "90d"
+   * @param opts - Optional window (`period`: "7d" default, "30d", or "90d")
+   *   plus a per-call `signal`/`timeoutMs` override
    * @returns Aggregated stats including clicks-by-day and dimension breakdowns
    */
   async getAggregateStats(
     shortPath: string,
-    opts?: { period?: "7d" | "30d" | "90d" },
+    opts?: { period?: "7d" | "30d" | "90d" } & RequestOptions,
   ): Promise<AggregateAnalytics> {
     const params: Record<string, string | number> = {};
     if (opts?.period !== undefined) params.period = opts.period;
-    return this.http.get<AggregateAnalytics>(
-      paths.links.aggregateStats(shortPath),
-      params,
-    );
+    return this.http.get<AggregateAnalytics>(paths.links.aggregateStats(shortPath), params, {
+      signal: opts?.signal,
+      timeoutMs: opts?.timeoutMs,
+    });
   }
 
   /**
@@ -56,15 +61,17 @@ export class AnalyticsResource {
    *   for backward compatibility per ADR-014) or an options object.
    * @param limitOrOpts.limit - Maximum number of recent click events to return
    * @param limitOrOpts.since - ISO 8601 timestamp; only return clicks after this time
+   * @param options - Per-call `signal`/`timeoutMs` override
    */
   async getRecentClicks(
     limitOrOpts?: number | GetRecentClicksOptions,
+    options?: RequestOptions,
   ): Promise<RecentClicksResult> {
     const opts: GetRecentClicksOptions =
       typeof limitOrOpts === "number" ? { limit: limitOrOpts } : (limitOrOpts ?? {});
     const params: Record<string, string | number> = {};
     if (opts.limit !== undefined) params.limit = opts.limit;
     if (opts.since !== undefined) params.since = opts.since;
-    return this.http.get<RecentClicksResult>(paths.analytics.recentClicks, params);
+    return this.http.get<RecentClicksResult>(paths.analytics.recentClicks, params, options);
   }
 }

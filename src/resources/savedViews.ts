@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import type { CreateSavedViewOptions, SavedView, UpdateSavedViewOptions } from "../types.js";
 
@@ -8,8 +8,8 @@ export class SavedViewsResource {
   /**
    * List all saved views for the authenticated user.
    */
-  async list(): Promise<{ views: SavedView[] }> {
-    return this.http.get<{ views: SavedView[] }>(paths.savedViews.base);
+  async list(options?: RequestOptions): Promise<{ views: SavedView[] }> {
+    return this.http.get<{ views: SavedView[] }>(paths.savedViews.base, undefined, options);
   }
 
   /**
@@ -17,8 +17,11 @@ export class SavedViewsResource {
    *
    * @param opts - View creation options including name and filters
    */
-  async create(opts: CreateSavedViewOptions): Promise<SavedView> {
-    return this.http.post<SavedView>(paths.savedViews.base, opts);
+  async create(
+    opts: CreateSavedViewOptions,
+    options?: RequestOptions,
+  ): Promise<SavedView> {
+    return this.http.post<SavedView>(paths.savedViews.base, opts, options);
   }
 
   /**
@@ -27,8 +30,12 @@ export class SavedViewsResource {
    * @param viewId - The ID of the view to update
    * @param opts - Fields to update
    */
-  async update(viewId: string, opts: UpdateSavedViewOptions): Promise<SavedView> {
-    return this.http.patch<SavedView>(paths.savedViews.byId(viewId), opts);
+  async update(
+    viewId: string,
+    opts: UpdateSavedViewOptions,
+    options?: RequestOptions,
+  ): Promise<SavedView> {
+    return this.http.patch<SavedView>(paths.savedViews.byId(viewId), opts, options);
   }
 
   /**
@@ -36,7 +43,7 @@ export class SavedViewsResource {
    *
    * @param viewId - The ID of the view to delete
    */
-  async delete(viewId: string): Promise<void> {
-    return this.http.delete<void>(paths.savedViews.byId(viewId));
+  async delete(viewId: string, options?: RequestOptions): Promise<void> {
+    return this.http.delete<void>(paths.savedViews.byId(viewId), options);
   }
 }

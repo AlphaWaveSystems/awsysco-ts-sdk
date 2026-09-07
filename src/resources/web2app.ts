@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
 import type { Web2AppSession } from "../types.js";
 
 export class Web2AppResource {
@@ -18,9 +18,11 @@ export class Web2AppResource {
    *
    * @param token - The single-use session token to consume
    */
-  async consumeSession(token: string): Promise<Web2AppSession> {
+  async consumeSession(token: string, options?: RequestOptions): Promise<Web2AppSession> {
     return this.http.get<Web2AppSession>(
       `/api/v1/web2app/${encodeURIComponent(token)}`,
+      undefined,
+      options,
     );
   }
 }
