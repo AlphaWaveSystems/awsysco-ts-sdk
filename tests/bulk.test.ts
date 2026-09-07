@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AwsysClient, AwsysForbiddenError } from "../src/index.js";
+import { AwsysClient } from "../src/index.js";
 
 const client = new AwsysClient({
   apiKey: process.env.AWSYS_API_KEY ?? "awsys_test_placeholder",

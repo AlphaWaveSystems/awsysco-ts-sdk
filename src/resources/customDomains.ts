@@ -43,9 +43,11 @@ export class CustomDomainsResource {
    * never makes this network call. Activate domains from the AWSYS
    * dashboard instead. Will be removed in the next major version.
    *
-   * @param domain - The domain to activate
+   * @param _domain - The domain that would be activated (unused — the SDK
+   * never calls the network for this deprecated method).
    */
-  async activate(domain: string): Promise<CustomDomain> {
+  // eslint-disable-next-line @typescript-eslint/require-await -- stays async to keep the method's return type a Promise, matching every other resource method's signature.
+  async activate(_domain: string): Promise<CustomDomain> {
     if (!activateDeprecationWarned) {
       activateDeprecationWarned = true;
       console.warn(

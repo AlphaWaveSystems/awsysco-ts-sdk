@@ -175,7 +175,7 @@ export interface Link {
   tags?: string[];
 }
 
-export interface ListLinksOptions extends PaginationParams {}
+export type ListLinksOptions = PaginationParams;
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
 

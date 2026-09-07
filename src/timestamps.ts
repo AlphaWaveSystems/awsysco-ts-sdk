@@ -11,7 +11,7 @@
  * validate response bodies elsewhere, and a new/changed timestamp shape
  * should degrade gracefully, not break every call that happens to touch it.
  */
-export function parseTimestamp(value: unknown): string | unknown {
+export function parseTimestamp(value: unknown): unknown {
   if (typeof value === "string") {
     return value;
   }
