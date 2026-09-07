@@ -1,6 +1,6 @@
 {
  "$schema": "awsys-sdk-contract/1",
- "version": "1.0.5",
+ "version": "1.0.6",
  "platformBaseline": "2026-09",
  "baseUrl": "https://awsys.co",
  "auth": {
@@ -431,16 +431,40 @@
    "response": {
     "status": 200,
     "body": {
-     "linksCreatedToday": 3,
-     "linksToday": 3,
-     "dailyLimit": 100,
-     "apiCallsThisMonth": 10,
-     "apiMonthlyLimit": 1000,
+     "totalLinks": 222,
+     "totalClicks": 5,
+     "linksCreatedThisMonth": 222,
+     "qrCodesThisMonth": 0,
+     "folderCount": 0,
+     "apiCallsThisMonth": 1,
+     "trackedClicksThisMonth": 5,
+     "tier": "pro",
+     "limits": {
+      "linksPerMonth": 1000,
+      "monthlyLinks": 1000,
+      "dailyLinks": 100,
+      "monthlyTrackedClicks": 10000,
+      "apiCallsPerMonth": 1000,
+      "qrCodes": 100,
+      "folders": 10,
+      "customSlugs": true
+     },
+     "hasApiKey": true,
+     "apiKeyCreatedAt": "2026-09-07T03:09:24.886Z",
+     "userPrefix": "op0p",
+     "isPremium": true,
      "overage": {
-      "enabled": false
+      "active": false,
+      "startedAt": null,
+      "expiresAt": null,
+      "hoursUntilDrop": null,
+      "clicksThisCycle": 0,
+      "spendingLimitCents": null,
+      "estimatedChargeCents": 0
      }
     }
-   }
+   },
+   "note": "verified live 2026-09-07 on staging; limits values illustrative, keys exact"
   },
   {
    "id": "recent_clicks",
