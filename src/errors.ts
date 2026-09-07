@@ -70,16 +70,20 @@ export class AwsysConflictError extends AwsysError {
 export class AwsysRateLimitError extends AwsysError {
   /** Seconds to wait before retrying, if provided by the server */
   readonly retryAfter?: number;
+  /** ISO timestamp (or provider-specific string) when a quota resets, if provided */
+  readonly resetsAt?: string;
 
   constructor(
     message: string,
     code: string,
     raw: unknown,
     retryAfter?: number,
+    resetsAt?: string,
   ) {
     super(message, 429, code, raw);
     this.name = "AwsysRateLimitError";
     this.retryAfter = retryAfter;
+    this.resetsAt = resetsAt;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
@@ -91,6 +95,52 @@ export class AwsysValidationError extends AwsysError {
   constructor(message: string, code: string, raw: unknown) {
     super(message, 400, code, raw);
     this.name = "AwsysValidationError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown for any unmapped HTTP 5xx server error.
+ */
+export class AwsysServerError extends AwsysError {
+  constructor(message: string, status: number, code: string, raw: unknown) {
+    super(message, status, code, raw);
+    this.name = "AwsysServerError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown on transport-level failures (connection refused, DNS failure, etc.)
+ * where no HTTP response was received.
+ */
+export class AwsysNetworkError extends AwsysError {
+  constructor(message: string, code: string, raw: unknown) {
+    super(message, 0, code, raw);
+    this.name = "AwsysNetworkError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a request is aborted after exceeding its timeout.
+ */
+export class AwsysTimeoutError extends AwsysNetworkError {
+  constructor(message: string, code: string, raw: unknown) {
+    super(message, code, raw);
+    this.name = "AwsysTimeoutError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown for invalid client configuration (missing API key, malformed base
+ * URL, etc.) before any network call is made.
+ */
+export class AwsysConfigurationError extends AwsysError {
+  constructor(message: string, code: string = "CONFIGURATION_ERROR") {
+    super(message, 0, code, undefined);
+    this.name = "AwsysConfigurationError";
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
