@@ -2,8 +2,29 @@ import type { HttpClient } from "../http.js";
 import { paths } from "../paths.js";
 import type { CreateUtmTemplateOptions, UtmTemplate } from "../types.js";
 
+interface RawUtmTemplate {
+  id: string;
+  name: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  term?: string;
+  content?: string;
+}
+
 interface MeResponse {
-  utmTemplates?: UtmTemplate[];
+  utmTemplates?: RawUtmTemplate[];
+}
+
+function mapUtmTemplate(raw: RawUtmTemplate): UtmTemplate {
+  return {
+    ...raw,
+    // Legacy aliases — kept for compat, mapped from the real wire fields
+    // rather than left permanently undefined.
+    source: raw.utmSource,
+    medium: raw.utmMedium,
+    campaign: raw.utmCampaign,
+  };
 }
 
 export class UtmTemplatesResource {
@@ -16,7 +37,7 @@ export class UtmTemplatesResource {
    */
   async list(): Promise<UtmTemplate[]> {
     const me = await this.http.get<MeResponse>(paths.utmTemplates.viaMe);
-    return me.utmTemplates ?? [];
+    return (me.utmTemplates ?? []).map(mapUtmTemplate);
   }
 
   /**
@@ -38,7 +59,8 @@ export class UtmTemplatesResource {
     if (utmCampaign !== undefined) body.utmCampaign = utmCampaign;
     if (opts.term !== undefined) body.term = opts.term;
     if (opts.content !== undefined) body.content = opts.content;
-    return this.http.post<UtmTemplate>(paths.utmTemplates.create, body);
+    const raw = await this.http.post<RawUtmTemplate>(paths.utmTemplates.create, body);
+    return mapUtmTemplate(raw);
   }
 
   /**

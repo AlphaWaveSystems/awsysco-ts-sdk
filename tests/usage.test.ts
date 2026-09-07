@@ -27,10 +27,14 @@ describe("UsageResource", () => {
 
   describe("get", () => {
     it("calls GET /api/user/stats and returns the parsed stats", async () => {
-      const expected: UsageStats = {
+      // The raw wire response — `linksCreatedThisMonth` is NOT a real
+      // platform field (see `linksCreatedThisMonth`'s @deprecated tsdoc in
+      // types.ts); the SDK derives it from `linksCreatedToday` below. The
+      // other legacy fields genuinely never appear on the wire, but pass
+      // through unchanged if present (proving the type stays open to them).
+      const raw = {
         totalLinks: 42,
         totalClicks: 1234,
-        linksCreatedThisMonth: 5,
         qrCodesThisMonth: 2,
         folderCount: 3,
         apiCallsThisMonth: 100,
@@ -59,8 +63,11 @@ describe("UsageResource", () => {
           spendingLimitCents: 5000,
           estimatedChargeCents: 0,
         },
+        linksCreatedToday: 5,
+        linksToday: 5,
       };
-      vi.mocked(http.get).mockResolvedValue(expected);
+      const expected: UsageStats = { ...raw, linksCreatedThisMonth: 5 };
+      vi.mocked(http.get).mockResolvedValue(raw);
 
       const result = await usage.get();
 

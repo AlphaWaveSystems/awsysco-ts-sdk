@@ -175,7 +175,8 @@ export interface Link {
   tags?: string[];
 }
 
-export type ListLinksOptions = PaginationParams;
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- kept as an interface (not a type alias) by design so it stays open to extension without a breaking change; currently identical to its supertype.
+export interface ListLinksOptions extends PaginationParams {}
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
 
@@ -409,8 +410,12 @@ export interface UsageStats {
   totalLinks?: number;
   /** @deprecated not present on the actual response. */
   totalClicks?: number;
-  /** @deprecated wire field is `linksCreatedToday`/`linksToday`. */
-  linksCreatedThisMonth?: number;
+  /**
+   * @deprecated prefer `linksCreatedToday` (the wire field) — despite the
+   * "ThisMonth" name (a legacy naming artifact), this mirrors the daily
+   * count, not a monthly one. Kept for compat, mapped from `linksCreatedToday`.
+   */
+  linksCreatedThisMonth: number | undefined;
   /** @deprecated not present on the actual response. */
   qrCodesThisMonth?: number;
   /** @deprecated not present on the actual response. */
@@ -502,18 +507,18 @@ export interface TagsResult {
 // ─── Trust Score ─────────────────────────────────────────────────────────────
 
 export interface TrustScoreResult {
-  /** Wire field is `shortCode` (links.js:566) — kept optional for compat, never populated. */
-  short?: string;
+  /** @deprecated prefer `shortCode` (the wire field, links.js:566) — kept for compat, mapped from it. */
+  short: string;
   /** @deprecated not present on the actual response. */
   long?: string;
-  /** @deprecated wire field is `trustScore` (links.js:567). */
-  score?: number | null;
-  /** @deprecated wire field is `trustStatus` (links.js:568). */
-  status?: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
-  shortCode?: string;
-  trustScore?: number | null;
-  trustStatus?: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
-  threats?: string[];
+  /** @deprecated prefer `trustScore` (the wire field, links.js:567) — kept for compat, mapped from it. */
+  score: number | null;
+  /** @deprecated prefer `trustStatus` (the wire field, links.js:568) — kept for compat, mapped from it. */
+  status: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  shortCode: string;
+  trustScore: number | null;
+  trustStatus: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  threats: string[];
   scannedAt?: string | null;
 }
 
@@ -538,12 +543,12 @@ export interface NamespaceCheckResult {
 export interface UtmTemplate {
   id: string;
   name: string;
-  /** @deprecated wire field is `utmSource` — this alias is never populated. Kept for compat. */
-  source?: string;
-  /** @deprecated wire field is `utmMedium` — this alias is never populated. Kept for compat. */
-  medium?: string;
-  /** @deprecated wire field is `utmCampaign` — this alias is never populated. Kept for compat. */
-  campaign?: string;
+  /** @deprecated prefer `utmSource` (the wire field) — kept for compat, mapped from it. */
+  source: string | undefined;
+  /** @deprecated prefer `utmMedium` (the wire field) — kept for compat, mapped from it. */
+  medium: string | undefined;
+  /** @deprecated prefer `utmCampaign` (the wire field) — kept for compat, mapped from it. */
+  campaign: string | undefined;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;

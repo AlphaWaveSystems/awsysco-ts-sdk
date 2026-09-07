@@ -25,44 +25,52 @@ describe("TrustScoreResource", () => {
   });
 
   describe("scan", () => {
-    it("calls GET /api/link-scan/:short and returns the result", async () => {
-      const expected = {
-        short: "abc123",
-        long: "https://example.com",
-        score: 95,
-        status: "safe" as const,
+    it("calls GET /api/link-scan/:short and returns the result, mapping legacy short/score/status aliases from the wire fields", async () => {
+      // Raw wire response — shortCode/trustScore/trustStatus/threats are
+      // the real platform fields (links.js:566-568); short/score/status are
+      // legacy aliases the SDK derives, not sent by the platform.
+      const raw = {
+        shortCode: "abc123",
+        trustScore: 95,
+        trustStatus: "safe" as const,
         threats: [],
         scannedAt: "2026-06-01T12:00:00Z",
       };
-      vi.mocked(http.get).mockResolvedValue(expected);
+      vi.mocked(http.get).mockResolvedValue(raw);
 
       const result = await trustScore.scan("abc123");
 
       expect(http.get).toHaveBeenCalledWith("/api/link-scan/abc123");
-      expect(result).toEqual(expected);
+      expect(result).toEqual({
+        ...raw,
+        short: "abc123",
+        score: 95,
+        status: "safe",
+      });
     });
 
     it("handles unknown status with null score", async () => {
-      const expected = {
-        short: "abc123",
-        long: "https://example.com",
-        score: null,
-        status: "unknown" as const,
+      vi.mocked(http.get).mockResolvedValue({
+        shortCode: "abc123",
+        trustScore: null,
+        trustStatus: "unknown" as const,
+        threats: [],
         scannedAt: null,
-      };
-      vi.mocked(http.get).mockResolvedValue(expected);
+      });
 
       const result = await trustScore.scan("abc123");
       expect(result.score).toBeNull();
       expect(result.status).toBe("unknown");
+      expect(result.trustScore).toBeNull();
+      expect(result.trustStatus).toBe("unknown");
     });
 
     it("URL-encodes namespaced short paths", async () => {
       vi.mocked(http.get).mockResolvedValue({
-        short: "ns/slug",
-        long: "https://example.com",
-        score: 80,
-        status: "safe" as const,
+        shortCode: "ns/slug",
+        trustScore: 80,
+        trustStatus: "safe" as const,
+        threats: [],
         scannedAt: null,
       });
 

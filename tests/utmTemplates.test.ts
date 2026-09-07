@@ -25,16 +25,21 @@ describe("UtmTemplatesResource", () => {
   });
 
   describe("list", () => {
-    it("calls GET /api/v1/me and returns utmTemplates array", async () => {
-      const templates = [
-        { id: "t1", name: "Summer Campaign", source: "email", medium: "newsletter", campaign: "summer" },
+    it("calls GET /api/v1/me and returns utmTemplates array, mapping legacy source/medium/campaign aliases from the wire fields", async () => {
+      // Raw wire response uses utmSource/utmMedium/utmCampaign (the real
+      // platform fields) — source/medium/campaign are legacy aliases the
+      // SDK derives, not sent by the platform.
+      const rawTemplates = [
+        { id: "t1", name: "Summer Campaign", utmSource: "email", utmMedium: "newsletter", utmCampaign: "summer" },
       ];
-      vi.mocked(http.get).mockResolvedValue({ utmTemplates: templates });
+      vi.mocked(http.get).mockResolvedValue({ utmTemplates: rawTemplates });
 
       const result = await utmTemplates.list();
 
       expect(http.get).toHaveBeenCalledWith("/api/v1/me");
-      expect(result).toEqual(templates);
+      expect(result).toEqual([
+        { ...rawTemplates[0], source: "email", medium: "newsletter", campaign: "summer" },
+      ]);
     });
 
     it("returns empty array when utmTemplates is missing from response", async () => {
