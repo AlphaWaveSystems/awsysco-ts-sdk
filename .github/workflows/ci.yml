@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Node 18 is EOL (April 2025) but kept as the SDK's minimum for
+        # 1.4.0 — see README's "Requirements" section. Expect this to drop
+        # in the next major.
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck (src)
+        run: npm run typecheck
+
+      - name: Typecheck (examples)
+        run: npx tsc --noEmit -p examples/tsconfig.json
+
+      - name: Test (unit + contract; integration auto-skips without AWSYS_API_KEY)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack + install smoke test (CJS + ESM resolve)
+        run: |
+          set -euo pipefail
+          npm pack --pack-destination /tmp
+          TARBALL="$(ls /tmp/awsysco-sdk-*.tgz)"
+          SMOKE_DIR="$(mktemp -d)"
+          cd "$SMOKE_DIR"
+          npm init -y >/dev/null
+          npm install "$TARBALL" >/dev/null
+          node -e "const sdk = require('@awsysco/sdk'); if (typeof sdk.AwsysClient !== 'function') throw new Error('CJS require() did not export AwsysClient');"
+          node --input-type=module -e "import('@awsysco/sdk').then((sdk) => { if (typeof sdk.AwsysClient !== 'function') throw new Error('ESM import() did not export AwsysClient'); });"
+          echo "CJS require() and ESM import() both resolved @awsysco/sdk successfully."

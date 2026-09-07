@@ -39,7 +39,7 @@ describe("SavedViewsResource", () => {
 
       const result = await savedViews.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/views");
+      expect(http.get).toHaveBeenCalledWith("/api/views", undefined, undefined);
       expect(result.views).toHaveLength(1);
     });
   });
@@ -51,7 +51,7 @@ describe("SavedViewsResource", () => {
 
       const result = await savedViews.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/views", opts);
+      expect(http.post).toHaveBeenCalledWith("/api/views", opts, undefined);
       expect(result.id).toBe("v1");
     });
   });
@@ -63,7 +63,11 @@ describe("SavedViewsResource", () => {
 
       const result = await savedViews.update("v1", { name: "Renamed View" });
 
-      expect(http.patch).toHaveBeenCalledWith("/api/views/v1", { name: "Renamed View" });
+      expect(http.patch).toHaveBeenCalledWith(
+        "/api/views/v1",
+        { name: "Renamed View" },
+        undefined,
+      );
       expect(result.name).toBe("Renamed View");
     });
   });
@@ -74,7 +78,7 @@ describe("SavedViewsResource", () => {
 
       await savedViews.delete("v1");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/views/v1");
+      expect(http.delete).toHaveBeenCalledWith("/api/views/v1", undefined);
     });
   });
 });

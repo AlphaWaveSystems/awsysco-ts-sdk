@@ -18,11 +18,11 @@ function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
 }
 
 const client = new AwsysClient({
-  apiKey: process.env.AWSYS_API_KEY!,
+  apiKey: process.env.AWSYS_API_KEY ?? "awsys_test_placeholder",
   baseUrl: process.env.AWSYS_BASE_URL ?? "https://staging.awsys.co",
 });
 
-describe("Analytics", () => {
+describe.skipIf(!process.env.AWSYS_API_KEY)("Analytics", () => {
   let shortCode: string;
   let setupSkip = false;
 
@@ -116,6 +116,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
     expect(http.get).toHaveBeenCalledWith(
       "/api/v1/links/abc123/stats/aggregate",
       { period: "30d" },
+      { signal: undefined, timeoutMs: undefined },
     );
     expect(result).toEqual(expected);
     expect(result.deviceBreakdown).toEqual({ mobile: 200, desktop: 300, tablet: 40 });
@@ -140,10 +141,13 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
     expect(http.get).toHaveBeenCalledWith(
       "/api/v1/links/abc123/stats/aggregate",
       {},
+      { signal: undefined, timeoutMs: undefined },
     );
   });
 
-  it("URL-encodes a namespaced short path", async () => {
+  it("preserves the slash for a namespaced short path (GET wildcard route)", async () => {
+    // Unlike PATCH (which must encode the slash — ADR-009), GET routes under
+    // /api/v1/links/* match an unencoded slash, same as get_link_namespaced.
     vi.mocked(http.get).mockResolvedValue({
       shortCode: "slug",
       fullPath: "ns/slug",
@@ -159,8 +163,9 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
     await analytics.getAggregateStats("ns/slug", { period: "7d" });
 
     expect(http.get).toHaveBeenCalledWith(
-      "/api/v1/links/ns%2Fslug/stats/aggregate",
+      "/api/v1/links/ns/slug/stats/aggregate",
       { period: "7d" },
+      { signal: undefined, timeoutMs: undefined },
     );
   });
 

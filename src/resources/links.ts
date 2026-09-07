@@ -1,4 +1,5 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
+import { paths } from "../paths.js";
 import type {
   CreateLinkOptions,
   CreatedLink,
@@ -8,11 +9,16 @@ import type {
   UpdateLinkOptions,
 } from "../types.js";
 
+const MAX_LIST_LIMIT = 100;
+
 interface RawListResponse {
   links?: Link[];
   data?: Link[];
-  total?: number;
-  hasMore?: boolean;
+  pagination?: {
+    limit?: number;
+    offset?: number;
+    hasMore?: boolean;
+  };
 }
 
 export class LinksResource {
@@ -24,28 +30,79 @@ export class LinksResource {
    * @param opts - Link creation options
    * @returns The created link details including the short URL
    */
-  async create(opts: CreateLinkOptions): Promise<CreatedLink> {
-    return this.http.post<CreatedLink>("/api/v1/links", opts);
+  async create(
+    opts: CreateLinkOptions,
+    options?: RequestOptions,
+  ): Promise<CreatedLink> {
+    return this.http.post<CreatedLink>(paths.links.base, opts, options);
   }
 
   /**
    * List all links for the authenticated user.
    *
-   * @param opts - Optional pagination parameters
+   * @param opts - Optional pagination parameters (`limit` is clamped to 100)
+   *   plus a per-call `signal`/`timeoutMs` override.
    */
-  async list(opts?: ListLinksOptions): Promise<PaginatedResponse<Link>> {
-    const params: Record<string, string | number> = {};
-    if (opts?.limit !== undefined) params.limit = opts.limit;
-    if (opts?.offset !== undefined) params.offset = opts.offset;
+  async list(
+    opts?: ListLinksOptions & RequestOptions,
+  ): Promise<PaginatedResponse<Link>> {
+    const limit =
+      opts?.limit !== undefined ? Math.min(opts.limit, MAX_LIST_LIMIT) : undefined;
+    const offset = opts?.offset;
 
-    const raw = await this.http.get<RawListResponse>("/api/v1/links", params);
+    const params: Record<string, string | number> = {};
+    if (limit !== undefined) params.limit = limit;
+    if (offset !== undefined) params.offset = offset;
+
+    const raw = await this.http.get<RawListResponse>(paths.links.base, params, {
+      signal: opts?.signal,
+      timeoutMs: opts?.timeoutMs,
+    });
 
     const data = raw.links ?? raw.data ?? [];
     return {
       data,
-      total: raw.total ?? data.length,
-      hasMore: raw.hasMore ?? false,
+      limit: raw.pagination?.limit ?? limit ?? data.length,
+      offset: raw.pagination?.offset ?? offset ?? 0,
+      hasMore: raw.pagination?.hasMore ?? false,
     };
+  }
+
+  /**
+   * Async-iterate over every link, paging automatically. `limit` (per page)
+   * is clamped to 100. Stops when the platform reports `hasMore: false`, or
+   * when a page comes back short/empty — guarding against a missing
+   * `hasMore` in the response.
+   *
+   * @example
+   * ```typescript
+   * for await (const link of client.links.listAll()) {
+   *   console.log(link.shortCode);
+   * }
+   * ```
+   */
+  async *listAll(
+    opts?: ListLinksOptions & RequestOptions,
+  ): AsyncGenerator<Link, void, void> {
+    const limit =
+      opts?.limit !== undefined ? Math.min(opts.limit, MAX_LIST_LIMIT) : MAX_LIST_LIMIT;
+    let offset = opts?.offset ?? 0;
+
+    while (true) {
+      const page = await this.list({
+        limit,
+        offset,
+        signal: opts?.signal,
+        timeoutMs: opts?.timeoutMs,
+      });
+      for (const link of page.data) {
+        yield link;
+      }
+      if (!page.hasMore || page.data.length < limit || page.data.length === 0) {
+        return;
+      }
+      offset += limit;
+    }
   }
 
   /**
@@ -53,8 +110,11 @@ export class LinksResource {
    *
    * @param shortPath - The short code (e.g. "abc123") or namespaced path (e.g. "ns/slug")
    */
-  async get(shortPath: string): Promise<Link> {
-    return this.http.get<Link>(`/api/v1/links/${encodeURIComponent(shortPath)}`);
+  async get(
+    shortPath: string,
+    options?: RequestOptions,
+  ): Promise<Link> {
+    return this.http.get<Link>(paths.links.byShortPath(shortPath), undefined, options);
   }
 
   /**
@@ -63,11 +123,12 @@ export class LinksResource {
    * @param shortPath - The short code or full path of the link to update
    * @param opts - Fields to update (url, expiry, click limit, routing rules, OG meta, etc.)
    */
-  async update(shortPath: string, opts: UpdateLinkOptions): Promise<Link> {
-    return this.http.patch<Link>(
-      `/api/v1/links/${encodeURIComponent(shortPath)}`,
-      opts,
-    );
+  async update(
+    shortPath: string,
+    opts: UpdateLinkOptions,
+    options?: RequestOptions,
+  ): Promise<Link> {
+    return this.http.patch<Link>(paths.links.byShortPathForUpdate(shortPath), opts, options);
   }
 
   /**
@@ -75,9 +136,7 @@ export class LinksResource {
    *
    * @param shortPath - The short code or full path of the link to delete
    */
-  async delete(shortPath: string): Promise<{ success: boolean }> {
-    return this.http.delete<{ success: boolean }>(
-      `/api/v1/links/${encodeURIComponent(shortPath)}`,
-    );
+  async delete(shortPath: string, options?: RequestOptions): Promise<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(paths.links.byShortPath(shortPath), options);
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@awsysco/sdk",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Official TypeScript/Node.js SDK for the AWSYS.CO URL Shortener API",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -18,11 +18,12 @@
     "SECURITY.md"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests examples"
   },
   "keywords": [
     "url-shortener",
@@ -37,11 +38,14 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^1.0.0",
     "dotenv": "^16.0.0",
+    "eslint": "^9.39.5",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
+    "typescript-eslint": "^8.69.0",
     "vitest": "^1.0.0"
   }
 }

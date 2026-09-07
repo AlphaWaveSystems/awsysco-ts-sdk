@@ -1,4 +1,5 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
+import { paths } from "../paths.js";
 import type { UsageStats } from "../types.js";
 
 export class UsageResource {
@@ -12,8 +13,12 @@ export class UsageResource {
    *
    * This is distinct from {@link MeResource.get} (`client.me.get()`), which
    * returns the static profile and plan limits — not live consumption.
+   *
+   * Every field on {@link UsageStats} maps 1:1 by name from the wire
+   * response — no remapping needed (verified live, see contract fixture
+   * 1.0.6's "usage" scenario).
    */
-  async get(): Promise<UsageStats> {
-    return this.http.get<UsageStats>("/api/user/stats");
+  async get(options?: RequestOptions): Promise<UsageStats> {
+    return this.http.get<UsageStats>(paths.usage.stats, undefined, options);
   }
 }

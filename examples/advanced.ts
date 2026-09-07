@@ -1,14 +1,20 @@
 /**
  * Advanced usage example for @awsysco/sdk
  *
- * Demonstrates: advanced link creation, webhooks, custom domains,
- * affiliate programs, saved views, and UTM templates.
+ * Demonstrates: advanced link creation, folders, QR codes, webhooks,
+ * custom domains, affiliate programs, saved views, UTM templates, profile,
+ * auto-pagination, and full error-class handling.
  *
  * Run with: npx tsx examples/advanced.ts
  * Requires: AWSYS_API_KEY environment variable
  */
 
-import { AwsysClient, AwsysError } from "../src/index.js";
+import {
+  AwsysClient,
+  AwsysError,
+  AwsysNotFoundError,
+  AwsysRateLimitError,
+} from "../src/index.js";
 
 const client = new AwsysClient({ apiKey: process.env.AWSYS_API_KEY! });
 
@@ -34,6 +40,36 @@ async function main() {
   });
   console.log("Created link:", link.shortUrl, "| short code:", link.shortCode);
 
+  // ─── Folders ───────────────────────────────────────────────────────────
+  console.log("\nCreating a folder...");
+  const folder = await client.folders.create({ name: "My Campaign", color: "3b82f6" });
+  console.log("Folder created:", folder.id, folder.name);
+
+  await client.folders.assignLink(link.shortCode, folder.id);
+  console.log("Link assigned to folder");
+
+  await client.folders.removeLink(link.shortCode);
+  console.log("Link removed from folder");
+
+  const folders = await client.folders.list();
+  console.log("Folders:", folders.map((f) => f.name).join(", "));
+
+  await client.folders.delete(folder.id);
+  console.log("Folder deleted");
+
+  // ─── QR codes ────────────────────────────────────────────────────────────
+  const qrUrl = client.qr.getUrl(link.shortCode, { size: 256, color: "000000" });
+  console.log("\nQR code URL:", qrUrl);
+
+  // ─── Auto-pagination ─────────────────────────────────────────────────────
+  console.log("\nIterating all links with listAll()...");
+  let seen = 0;
+  for await (const _link of client.links.listAll({ limit: 20 })) {
+    seen += 1;
+    if (seen > 100) break; // demo safety net — don't page through a huge account
+  }
+  console.log(`Iterated ${seen} link(s) across as many pages as needed.`);
+
   // ─── Webhooks ────────────────────────────────────────────────────────────
   console.log("\nListing webhook event types...");
   const { eventTypes } = await client.webhooks.listEventTypes();
@@ -46,9 +82,8 @@ async function main() {
     name: "My webhook",
     secret: "super-secret-value",
   });
-  console.log("Webhook created:", webhook.id);
+  console.log("Webhook created:", webhook.id, "| enabled:", webhook.enabled ?? "(unknown — legacy doc)");
 
-  // Clean up webhook
   await client.webhooks.delete(webhook.id);
   console.log("Webhook deleted");
 
@@ -66,18 +101,14 @@ async function main() {
   try {
     const program = await client.affiliate.createProgram({
       name: "My Affiliate Program",
-      description: "Earn commissions by referring users",
-      commissionType: "cpc",
-      cpcRate: 0.05,
+      commissionRate: 10,
       cookieDays: 30,
     });
     console.log("Program created:", program.id);
 
-    // Discover public programs
     const publicPrograms = await client.affiliate.discover(5);
     console.log("Public programs:", publicPrograms.length);
 
-    // Clean up
     // (programs don't have a delete endpoint — just leave it for demo purposes)
   } catch (err) {
     if (err instanceof AwsysError) {
@@ -97,11 +128,9 @@ async function main() {
     });
     console.log("View created:", view.id, view.name);
 
-    // Update the view
     await client.savedViews.update(view.id, { name: "Launch campaign links" });
     console.log("View renamed");
 
-    // Clean up
     await client.savedViews.delete(view.id);
     console.log("View deleted");
   } catch (err) {
@@ -113,20 +142,18 @@ async function main() {
   // ─── UTM templates ───────────────────────────────────────────────────────
   console.log("\nCreating a UTM template...");
   try {
-    const { template } = await client.utmTemplates.create({
+    const template = await client.utmTemplates.create({
       name: "Newsletter CTA",
-      source: "newsletter",
-      medium: "email",
-      campaign: "weekly-digest",
+      utmSource: "newsletter",
+      utmMedium: "email",
+      utmCampaign: "weekly-digest",
       content: "cta-button",
     });
     console.log("Template created:", template.id);
 
-    // List templates
     const templates = await client.utmTemplates.list();
     console.log("UTM templates:", templates.length);
 
-    // Clean up
     await client.utmTemplates.delete(template.id);
     console.log("Template deleted");
   } catch (err) {
@@ -138,7 +165,9 @@ async function main() {
   // ─── Trust score ─────────────────────────────────────────────────────────
   console.log("\nScanning link trust score...");
   const scan = await client.trustScore.scan(link.shortCode);
-  console.log(`Trust score for ${scan.short}: ${scan.score ?? "not yet scanned"} (${scan.status})`);
+  console.log(
+    `Trust score for ${scan.shortCode ?? link.shortCode}: ${scan.trustScore ?? "not yet scanned"} (${scan.trustStatus})`,
+  );
 
   // ─── Namespace ───────────────────────────────────────────────────────────
   console.log("\nChecking namespace...");
@@ -150,10 +179,33 @@ async function main() {
     console.log("'mynamespace' available:", availability.available);
   }
 
+  // ─── Profile ─────────────────────────────────────────────────────────────
+  console.log("\nFetching profile...");
+  const profile = await client.profile.get();
+  console.log("Profile:", profile.email, "| display name:", profile.displayName ?? "(none)");
+  await client.profile.update({ displayName: "New Display Name" });
+  console.log("Profile updated");
+
+  // ─── Error handling ───────────────────────────────────────────────────────
+  console.log("\nError handling example...");
+  try {
+    await client.analytics.getStats("this-does-not-exist");
+  } catch (err) {
+    if (err instanceof AwsysNotFoundError) {
+      console.log("Not found:", err.message);
+    } else if (err instanceof AwsysRateLimitError) {
+      console.log("Rate limited. Retry after:", err.retryAfter, "seconds");
+    } else if (err instanceof AwsysError) {
+      console.log(`API error [${err.status}]:`, err.message, `(code: ${err.code})`);
+    } else {
+      throw err;
+    }
+  }
+
   console.log("\nAll done!");
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err.message);
+main().catch((err: unknown) => {
+  console.error("Fatal error:", err instanceof Error ? err.message : err);
   process.exit(1);
 });

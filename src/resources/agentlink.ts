@@ -1,4 +1,5 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
+import { paths } from "../paths.js";
 import type { AgentLinkStats } from "../types.js";
 
 export class AgentlinkResource {
@@ -10,8 +11,12 @@ export class AgentlinkResource {
    *
    * @param email - The email address to subscribe
    */
-  async subscribe(email: string): Promise<{ success: boolean }> {
-    return this.http.post<{ success: boolean }>("/api/agentlink/subscribe", { email });
+  async subscribe(email: string, options?: RequestOptions): Promise<{ success: boolean }> {
+    return this.http.post<{ success: boolean }>(
+      paths.agentlink.subscribe,
+      { email },
+      options,
+    );
   }
 
   /**
@@ -20,13 +25,14 @@ export class AgentlinkResource {
    * @param shortPath - The short code or namespaced path
    * @param periodDays - Number of days to look back (default: 7)
    */
-  async getLinkStats(shortPath: string, periodDays?: number): Promise<AgentLinkStats> {
+  async getLinkStats(
+    shortPath: string,
+    periodDays?: number,
+    options?: RequestOptions,
+  ): Promise<AgentLinkStats> {
     const params: Record<string, string | number> = {};
     if (periodDays !== undefined) params.period = periodDays;
-    return this.http.get<AgentLinkStats>(
-      `/api/agentlink/links/${encodeURIComponent(shortPath)}/stats`,
-      params,
-    );
+    return this.http.get<AgentLinkStats>(paths.agentlink.linkStats(shortPath), params, options);
   }
 
   /**
@@ -34,9 +40,12 @@ export class AgentlinkResource {
    *
    * @param periodDays - Number of days to look back (default: 7)
    */
-  async getAccountStats(periodDays?: number): Promise<AgentLinkStats> {
+  async getAccountStats(
+    periodDays?: number,
+    options?: RequestOptions,
+  ): Promise<AgentLinkStats> {
     const params: Record<string, string | number> = {};
     if (periodDays !== undefined) params.period = periodDays;
-    return this.http.get<AgentLinkStats>("/api/agentlink/account/stats", params);
+    return this.http.get<AgentLinkStats>(paths.agentlink.accountStats, params, options);
   }
 }

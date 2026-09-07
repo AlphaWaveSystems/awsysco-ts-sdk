@@ -1,5 +1,6 @@
-import type { HttpClient } from "../http.js";
-import type { ImportJob } from "../types.js";
+import type { HttpClient, RequestOptions } from "../http.js";
+import { paths } from "../paths.js";
+import type { ImportJob, ImportRedirectMap } from "../types.js";
 
 /** Terminal statuses at which an import job stops progressing. */
 const TERMINAL_STATUSES = ["completed", "partial", "failed", "cancelled"];
@@ -23,6 +24,12 @@ export interface WaitForCompletionOptions {
   pollIntervalMs?: number;
   /** Maximum time to wait before throwing. Defaults to 120000ms. */
   timeoutMs?: number;
+  /**
+   * Per-call `signal`/`timeoutMs` override forwarded to each underlying
+   * status request (distinct from the top-level `timeoutMs` above, which
+   * bounds the whole polling loop, not a single HTTP request).
+   */
+  requestOptions?: RequestOptions;
 }
 
 /**
@@ -46,18 +53,18 @@ export class ImportsResource {
    * @param opts.targetNamespace - Optional namespace to write links into
    * @param opts.scanOnly - When true, perform a dry run without writing links
    */
-  async start(opts: StartImportOptions): Promise<ImportJob> {
+  async start(opts: StartImportOptions, options?: RequestOptions): Promise<ImportJob> {
     const body: Record<string, unknown> = {
       provider: opts.provider,
-      access_token: opts.accessToken,
+      accessToken: opts.accessToken,
     };
     if (opts.targetNamespace !== undefined) {
-      body.target_namespace = opts.targetNamespace;
+      body.targetNamespace = opts.targetNamespace;
     }
     if (opts.scanOnly !== undefined) {
-      body.scan_only = opts.scanOnly;
+      body.scanOnly = opts.scanOnly;
     }
-    return this.http.post<ImportJob>("/api/v1/imports", body);
+    return this.http.post<ImportJob>(paths.imports.base, body, options);
   }
 
   /**
@@ -65,10 +72,8 @@ export class ImportsResource {
    *
    * @param jobId - The import job ID
    */
-  async getStatus(jobId: string): Promise<ImportJob> {
-    return this.http.get<ImportJob>(
-      `/api/v1/imports/${encodeURIComponent(jobId)}`,
-    );
+  async getStatus(jobId: string, options?: RequestOptions): Promise<ImportJob> {
+    return this.http.get<ImportJob>(paths.imports.byId(jobId), undefined, options);
   }
 
   /**
@@ -76,10 +81,8 @@ export class ImportsResource {
    *
    * @param jobId - The import job ID
    */
-  async cancel(jobId: string): Promise<ImportJob> {
-    return this.http.delete<ImportJob>(
-      `/api/v1/imports/${encodeURIComponent(jobId)}`,
-    );
+  async cancel(jobId: string, options?: RequestOptions): Promise<ImportJob> {
+    return this.http.delete<ImportJob>(paths.imports.byId(jobId), options);
   }
 
   /**
@@ -87,14 +90,42 @@ export class ImportsResource {
    *
    * @param opts.limit - Maximum number of jobs to return
    */
-  async list(opts?: { limit?: number }): Promise<ImportJob[]> {
+  async list(
+    opts?: { limit?: number } & RequestOptions,
+  ): Promise<ImportJob[]> {
     const params: Record<string, string | number> = {};
     if (opts?.limit !== undefined) params.limit = opts.limit;
-    const response = await this.http.get<{ jobs: ImportJob[] }>(
-      "/api/v1/imports",
-      params,
-    );
+    const response = await this.http.get<{ jobs: ImportJob[] }>(paths.imports.base, params, {
+      signal: opts?.signal,
+      timeoutMs: opts?.timeoutMs,
+    });
     return response.jobs;
+  }
+
+  /**
+   * Download the redirect map for a completed import as raw CSV text
+   * (`old_url,new_url` rows).
+   *
+   * @param jobId - The import job ID
+   */
+  async getRedirectMapCsv(jobId: string, options?: RequestOptions): Promise<string> {
+    return this.http.getText(paths.imports.redirectMapCsv(jobId), undefined, options);
+  }
+
+  /**
+   * Download the redirect map for a completed import as structured JSON.
+   *
+   * @param jobId - The import job ID
+   */
+  async getRedirectMapJson(
+    jobId: string,
+    options?: RequestOptions,
+  ): Promise<ImportRedirectMap> {
+    return this.http.get<ImportRedirectMap>(
+      paths.imports.redirectMapJson(jobId),
+      undefined,
+      options,
+    );
   }
 
   /**
@@ -103,7 +134,8 @@ export class ImportsResource {
    *
    * @param jobId - The import job ID
    * @param opts.pollIntervalMs - How often to poll (default 2000ms)
-   * @param opts.timeoutMs - Maximum time to wait (default 120000ms)
+   * @param opts.timeoutMs - Maximum time to wait for the whole poll loop (default 120000ms)
+   * @param opts.requestOptions - Per-call `signal`/`timeoutMs` forwarded to each status request
    * @throws Error if the job has not reached a terminal status before the timeout
    */
   async waitForCompletion(
@@ -115,7 +147,7 @@ export class ImportsResource {
     const deadline = Date.now() + timeoutMs;
 
     while (true) {
-      const job = await this.getStatus(jobId);
+      const job = await this.getStatus(jobId, opts?.requestOptions);
       if (TERMINAL_STATUSES.includes(job.status)) {
         return job;
       }

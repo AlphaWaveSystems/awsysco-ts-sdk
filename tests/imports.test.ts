@@ -43,7 +43,10 @@ describe("ImportsResource", () => {
   });
 
   describe("start", () => {
-    it("POSTs a snake_case body to /api/v1/imports and parses the job", async () => {
+    it("POSTs a camelCase body to /api/v1/imports and parses the job", async () => {
+      // The platform expects camelCase body keys (matches the contract
+      // fixture's `import_start` scenario) — the SDK previously sent
+      // snake_case, which the platform silently ignored.
       const expected = makeJob({ status: "queued" });
       vi.mocked(http.post).mockResolvedValue(expected);
 
@@ -54,12 +57,16 @@ describe("ImportsResource", () => {
         scanOnly: true,
       });
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
-        provider: "bitly",
-        access_token: "tok_secret",
-        target_namespace: "acme",
-        scan_only: true,
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {
+          provider: "bitly",
+          accessToken: "tok_secret",
+          targetNamespace: "acme",
+          scanOnly: true,
+        },
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
 
@@ -68,13 +75,17 @@ describe("ImportsResource", () => {
 
       await imports.start({ provider: "bitly", accessToken: "tok" });
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
-        provider: "bitly",
-        access_token: "tok",
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {
+          provider: "bitly",
+          accessToken: "tok",
+        },
+        undefined,
+      );
     });
 
-    it("forwards scan_only: false explicitly when set", async () => {
+    it("forwards scanOnly: false explicitly when set", async () => {
       vi.mocked(http.post).mockResolvedValue(makeJob());
 
       await imports.start({
@@ -83,11 +94,15 @@ describe("ImportsResource", () => {
         scanOnly: false,
       });
 
-      expect(http.post).toHaveBeenCalledWith("/api/v1/imports", {
-        provider: "bitly",
-        access_token: "tok",
-        scan_only: false,
-      });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {
+          provider: "bitly",
+          accessToken: "tok",
+          scanOnly: false,
+        },
+        undefined,
+      );
     });
   });
 
@@ -98,7 +113,7 @@ describe("ImportsResource", () => {
 
       const result = await imports.getStatus("imp_123");
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports/imp_123");
+      expect(http.get).toHaveBeenCalledWith("/api/v1/imports/imp_123", undefined, undefined);
       expect(result).toEqual(expected);
     });
 
@@ -107,7 +122,11 @@ describe("ImportsResource", () => {
 
       await imports.getStatus("imp/abc 1");
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports/imp%2Fabc%201");
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports/imp%2Fabc%201",
+        undefined,
+        undefined,
+      );
     });
   });
 
@@ -118,7 +137,7 @@ describe("ImportsResource", () => {
 
       const result = await imports.cancel("imp_123");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/v1/imports/imp_123");
+      expect(http.delete).toHaveBeenCalledWith("/api/v1/imports/imp_123", undefined);
       expect(result.status).toBe("cancelled");
     });
   });
@@ -130,7 +149,11 @@ describe("ImportsResource", () => {
 
       const result = await imports.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports", {});
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        {},
+        { signal: undefined, timeoutMs: undefined },
+      );
       expect(result).toEqual(jobs);
     });
 
@@ -139,7 +162,11 @@ describe("ImportsResource", () => {
 
       await imports.list({ limit: 5 });
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/imports", { limit: 5 });
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports",
+        { limit: 5 },
+        { signal: undefined, timeoutMs: undefined },
+      );
     });
   });
 
@@ -183,6 +210,40 @@ describe("ImportsResource", () => {
           timeoutMs: 5,
         }),
       ).rejects.toThrow(/did not reach a terminal status within 5ms/);
+    });
+  });
+
+  describe("getRedirectMapCsv", () => {
+    it("GETs the CSV redirect map as raw text", async () => {
+      const csv = "old_url,new_url\nhttps://bit.ly/x,https://awsys.co/x\n";
+      vi.mocked(http.getText).mockResolvedValue(csv);
+
+      const result = await imports.getRedirectMapCsv("imp_123");
+
+      expect(http.getText).toHaveBeenCalledWith(
+        "/api/v1/imports/imp_123/redirect-map.csv",
+        undefined,
+        undefined,
+      );
+      expect(result).toBe(csv);
+    });
+  });
+
+  describe("getRedirectMapJson", () => {
+    it("GETs the JSON redirect map and returns the mappings array", async () => {
+      const expected = {
+        mappings: [{ from: "https://bit.ly/x", to: "https://awsys.co/x" }],
+      };
+      vi.mocked(http.get).mockResolvedValue(expected);
+
+      const result = await imports.getRedirectMapJson("imp_123");
+
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/imports/imp_123/redirect-map.json",
+        undefined,
+        undefined,
+      );
+      expect(result).toEqual(expected);
     });
   });
 });

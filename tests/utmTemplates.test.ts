@@ -25,16 +25,21 @@ describe("UtmTemplatesResource", () => {
   });
 
   describe("list", () => {
-    it("calls GET /api/v1/me and returns utmTemplates array", async () => {
-      const templates = [
-        { id: "t1", name: "Summer Campaign", source: "email", medium: "newsletter", campaign: "summer" },
+    it("calls GET /api/v1/me and returns utmTemplates array, mapping legacy source/medium/campaign aliases from the wire fields", async () => {
+      // Raw wire response uses utmSource/utmMedium/utmCampaign (the real
+      // platform fields) — source/medium/campaign are legacy aliases the
+      // SDK derives, not sent by the platform.
+      const rawTemplates = [
+        { id: "t1", name: "Summer Campaign", utmSource: "email", utmMedium: "newsletter", utmCampaign: "summer" },
       ];
-      vi.mocked(http.get).mockResolvedValue({ utmTemplates: templates });
+      vi.mocked(http.get).mockResolvedValue({ utmTemplates: rawTemplates });
 
       const result = await utmTemplates.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/me");
-      expect(result).toEqual(templates);
+      expect(http.get).toHaveBeenCalledWith("/api/v1/me", undefined, undefined);
+      expect(result).toEqual([
+        { ...rawTemplates[0], source: "email", medium: "newsletter", campaign: "summer" },
+      ]);
     });
 
     it("returns empty array when utmTemplates is missing from response", async () => {
@@ -46,34 +51,74 @@ describe("UtmTemplatesResource", () => {
   });
 
   describe("create", () => {
-    it("calls POST /api/user/utm-templates and returns the template", async () => {
+    it("normalizes source/medium/campaign to the wire fields utmSource/utmMedium/utmCampaign", async () => {
       const opts = { name: "Launch", source: "twitter", medium: "social", campaign: "launch" };
-      const expected = {
-        success: true,
-        template: { id: "t2", ...opts },
-      };
+      const expected = { id: "t2", name: "Launch" };
       vi.mocked(http.post).mockResolvedValue(expected);
 
       const result = await utmTemplates.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", opts);
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/utm-templates",
+        {
+          name: "Launch",
+          utmSource: "twitter",
+          utmMedium: "social",
+          utmCampaign: "launch",
+        },
+        undefined,
+      );
       expect(result).toEqual(expected);
+    });
+
+    it("prefers utmSource/utmMedium/utmCampaign when both old and new fields are given", async () => {
+      vi.mocked(http.post).mockResolvedValue({ id: "t2", name: "Launch" });
+
+      await utmTemplates.create({
+        name: "Launch",
+        source: "ignored",
+        utmSource: "twitter",
+        utmMedium: "social",
+        utmCampaign: "launch",
+      });
+
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/utm-templates",
+        {
+          name: "Launch",
+          utmSource: "twitter",
+          utmMedium: "social",
+          utmCampaign: "launch",
+        },
+        undefined,
+      );
     });
 
     it("includes optional term and content fields when provided", async () => {
       const opts = {
         name: "Detailed",
-        source: "google",
-        medium: "cpc",
-        campaign: "brand",
+        utmSource: "google",
+        utmMedium: "cpc",
+        utmCampaign: "brand",
         term: "url shortener",
         content: "ad-variant-b",
       };
-      vi.mocked(http.post).mockResolvedValue({ success: true, template: { id: "t3", ...opts } });
+      vi.mocked(http.post).mockResolvedValue({ id: "t3", ...opts });
 
       await utmTemplates.create(opts);
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/utm-templates", opts);
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/utm-templates",
+        {
+          name: "Detailed",
+          utmSource: "google",
+          utmMedium: "cpc",
+          utmCampaign: "brand",
+          term: "url shortener",
+          content: "ad-variant-b",
+        },
+        undefined,
+      );
     });
   });
 
@@ -83,7 +128,7 @@ describe("UtmTemplatesResource", () => {
 
       const result = await utmTemplates.delete("t1");
 
-      expect(http.delete).toHaveBeenCalledWith("/api/user/utm-templates/t1");
+      expect(http.delete).toHaveBeenCalledWith("/api/user/utm-templates/t1", undefined);
       expect(result).toEqual({ success: true });
     });
   });

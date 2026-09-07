@@ -39,7 +39,11 @@ describe("Web2AppResource", () => {
 
       const result = await web2app.consumeSession("tok_abc123");
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/web2app/tok_abc123");
+      expect(http.get).toHaveBeenCalledWith(
+        "/api/v1/web2app/tok_abc123",
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
 
@@ -57,6 +61,8 @@ describe("Web2AppResource", () => {
 
       expect(http.get).toHaveBeenCalledWith(
         "/api/v1/web2app/tok%2Fwith%2Bspecial",
+        undefined,
+        undefined,
       );
     });
 

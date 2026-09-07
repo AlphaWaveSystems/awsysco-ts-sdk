@@ -35,7 +35,7 @@ describe("NamespaceResource", () => {
 
       const result = await namespace.get();
 
-      expect(http.get).toHaveBeenCalledWith("/api/user/namespace");
+      expect(http.get).toHaveBeenCalledWith("/api/user/namespace", undefined, undefined);
       expect(result).toEqual(expected);
     });
 
@@ -65,7 +65,7 @@ describe("NamespaceResource", () => {
 
       const result = await namespace.check("myns");
 
-      expect(http.get).toHaveBeenCalledWith("/api/namespace/check/myns");
+      expect(http.get).toHaveBeenCalledWith("/api/namespace/check/myns", undefined, undefined);
       expect(result).toEqual(expected);
     });
 
@@ -91,7 +91,11 @@ describe("NamespaceResource", () => {
 
       const result = await namespace.claim("myns");
 
-      expect(http.post).toHaveBeenCalledWith("/api/user/namespace", { namespace: "myns" });
+      expect(http.post).toHaveBeenCalledWith(
+        "/api/user/namespace",
+        { namespace: "myns" },
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
   });
@@ -102,7 +106,7 @@ describe("NamespaceResource", () => {
 
       const result = await namespace.release();
 
-      expect(http.delete).toHaveBeenCalledWith("/api/user/namespace");
+      expect(http.delete).toHaveBeenCalledWith("/api/user/namespace", undefined);
       expect(result).toEqual({ success: true });
     });
   });

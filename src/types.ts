@@ -9,18 +9,35 @@ export interface AwsysClientConfig {
    */
   baseUrl?: string;
   /**
-   * Maximum number of automatic retries on 429 responses.
+   * Maximum number of automatic retries on 429 responses, and on 502/503/504
+   * or transport errors for idempotent methods (GET/PUT/DELETE).
    * @default 3
    */
   maxRetries?: number;
+  /**
+   * Per-request timeout in milliseconds, enforced via `AbortController`.
+   * Overridable per call via `{ timeoutMs }` on individual resource methods
+   * that accept request options.
+   * @default 30000
+   */
+  timeoutMs?: number;
 }
 
 // ─── Pagination ──────────────────────────────────────────────────────────────
 
+/**
+ * The platform does not return a total count across all pages, only whether
+ * more pages exist (`hasMore`) — `total` is kept only for backward
+ * compatibility (ADR-014: minors never drop a public field) and is always
+ * `undefined`. Use `hasMore` instead.
+ */
 export interface PaginatedResponse<T> {
   data: T[];
-  total: number;
+  limit: number;
+  offset: number;
   hasMore: boolean;
+  /** @deprecated Always `undefined` since 1.4.0 — the platform never returns a total. Use `hasMore`. */
+  total?: number;
 }
 
 export interface PaginationParams {
@@ -158,6 +175,7 @@ export interface Link {
   tags?: string[];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- kept as an interface (not a type alias) by design so it stays open to extension without a breaking change; currently identical to its supertype.
 export interface ListLinksOptions extends PaginationParams {}
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
@@ -167,6 +185,30 @@ export interface ClickEvent {
   country: string | null;
   device: string | null;
   userAgent: string | null;
+}
+
+/**
+ * A single entry returned by `client.analytics.getRecentClicks()`.
+ */
+export interface RecentClickEntry {
+  shortCode: string;
+  timestamp: string | null;
+  country: string | null;
+}
+
+export interface GetRecentClicksOptions {
+  /** Maximum number of recent click events to return */
+  limit?: number;
+  /** ISO 8601 timestamp; only return clicks after this time */
+  since?: string;
+}
+
+/**
+ * Response shape for `GET /api/user/clicks/recent`.
+ */
+export interface RecentClicksResult {
+  clicks: RecentClickEntry[];
+  count: number;
 }
 
 /**
@@ -313,6 +355,25 @@ export interface Me {
   limits?: MeLimits;
 }
 
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+/**
+ * The authenticated user's editable profile, returned by
+ * `client.profile.get()`/`client.profile.update()`. Distinct from
+ * {@link Me} (static plan/feature info) and {@link UsageStats} (live
+ * consumption).
+ */
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string | null;
+  subscriptionTier?: string;
+}
+
+export interface UpdateProfileOptions {
+  displayName?: string;
+}
+
 // ─── Usage ───────────────────────────────────────────────────────────────────
 
 export interface UsageLimits {
@@ -323,7 +384,8 @@ export interface UsageLimits {
   apiCallsPerMonth: number;
   qrCodes: number | 'unlimited';
   folders: number | 'unlimited';
-  customSlugs: number;
+  /** A feature flag on some tiers, a count on others — platform-defined. */
+  customSlugs: number | boolean;
 }
 
 export interface UsageOverage {
@@ -332,7 +394,7 @@ export interface UsageOverage {
   expiresAt: string | null;
   hoursUntilDrop: number | null;
   clicksThisCycle: number;
-  spendingLimitCents: number;
+  spendingLimitCents: number | null;
   estimatedChargeCents: number;
 }
 
@@ -343,6 +405,10 @@ export interface UsageOverage {
  * profile/plan limits — this returns the user's *current* consumption against
  * those limits (links/clicks/QR codes/API calls used this period, overage
  * state, etc.).
+ *
+ * Verified against the live `GET /api/user/stats` response (contract fixture
+ * 1.0.6, "usage" scenario) — every field below is a real, always-present wire
+ * field mapped 1:1 by name.
  */
 export interface UsageStats {
   totalLinks: number;
@@ -359,6 +425,19 @@ export interface UsageStats {
   userPrefix: string | null;
   isPremium: boolean;
   overage: UsageOverage;
+  /**
+   * @deprecated legacy field from an earlier (incorrect) understanding of
+   * this endpoint's shape — not present on the real response. Kept optional
+   * for source compatibility with pre-1.4.0 consumer code; will be removed
+   * in the next major.
+   */
+  linksCreatedToday?: number;
+  /** @deprecated see `linksCreatedToday` — not present on the real response. */
+  linksToday?: number;
+  /** @deprecated see `linksCreatedToday` — not present on the real response. */
+  dailyLimit?: number;
+  /** @deprecated see `linksCreatedToday` — not present on the real response. */
+  apiMonthlyLimit?: number;
 }
 
 // ─── Web2App ─────────────────────────────────────────────────────────────────
@@ -400,6 +479,22 @@ export interface ImportJob {
   updatedAt: string | null;
 }
 
+/**
+ * A single old-URL → new-URL mapping entry in an import job's redirect map,
+ * returned by `client.imports.getRedirectMapJson()`.
+ */
+export interface ImportRedirectMapEntry {
+  from: string;
+  to: string;
+}
+
+/**
+ * Response shape for `GET /api/v1/imports/:jobId/redirect-map.json`.
+ */
+export interface ImportRedirectMap {
+  mappings: ImportRedirectMapEntry[];
+}
+
 // ─── Tags ────────────────────────────────────────────────────────────────────
 
 export interface TagsResult {
@@ -410,11 +505,18 @@ export interface TagsResult {
 // ─── Trust Score ─────────────────────────────────────────────────────────────
 
 export interface TrustScoreResult {
+  /** @deprecated prefer `shortCode` (the wire field, links.js:566) — kept for compat, mapped from it. */
   short: string;
-  long: string;
+  /** @deprecated not present on the actual response. */
+  long?: string;
+  /** @deprecated prefer `trustScore` (the wire field, links.js:567) — kept for compat, mapped from it. */
   score: number | null;
+  /** @deprecated prefer `trustStatus` (the wire field, links.js:568) — kept for compat, mapped from it. */
   status: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
-  threats?: string[];
+  shortCode: string;
+  trustScore: number | null;
+  trustStatus: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  threats: string[];
   scannedAt?: string | null;
 }
 
@@ -439,34 +541,55 @@ export interface NamespaceCheckResult {
 export interface UtmTemplate {
   id: string;
   name: string;
-  source: string;
-  medium: string;
-  campaign: string;
+  /** @deprecated prefer `utmSource` (the wire field) — kept for compat, mapped from it. */
+  source: string | undefined;
+  /** @deprecated prefer `utmMedium` (the wire field) — kept for compat, mapped from it. */
+  medium: string | undefined;
+  /** @deprecated prefer `utmCampaign` (the wire field) — kept for compat, mapped from it. */
+  campaign: string | undefined;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
   term?: string;
   content?: string;
 }
 
 export interface CreateUtmTemplateOptions {
   name: string;
-  source: string;
-  medium: string;
-  campaign: string;
+  /** @deprecated use `utmSource` — the platform reads `utmSource`, not `source`. Kept for compat; ignored if `utmSource` is also set. */
+  source?: string;
+  /** @deprecated use `utmMedium`. */
+  medium?: string;
+  /** @deprecated use `utmCampaign`. */
+  campaign?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
   term?: string;
   content?: string;
 }
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
 
+/**
+ * `serializeWebhook` on the platform spreads the stored doc as-is
+ * (services/webhooks.js:82) — legacy webhook docs seen live on staging lack
+ * `enabled`/`secret` entirely, so every field except `id`/`url`/`events` is
+ * optional here. `enabled` must never be assumed `true` when absent.
+ */
 export interface Webhook {
   id: string;
   url: string;
   events: string[];
   name?: string;
-  enabled: boolean;
-  createdAt: string | null;
-  updatedAt: string | null;
-  lastTriggered: string | null;
+  /** Wire field is `enabled` (services/webhooks.js:122,150), never `active`. Absent on legacy docs — do not default to `true`. */
+  enabled?: boolean;
+  secret?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  lastTriggered?: string | null;
   failureCount?: number;
+  successCount?: number;
 }
 
 export interface WebhookEventType {
@@ -546,10 +669,15 @@ export interface AgentClickEntry {
 }
 
 export interface AgentLinkStats {
+  shortCode?: string;
+  /** @deprecated wire field is `shortCode`. */
   short?: string;
-  totalAgentClicks: number;
-  agentClicks: AgentClickEntry[];
-  periodDays: number;
+  agentClicks: number;
+  clicks?: AgentClickEntry[];
+  byAgent?: Record<string, number>;
+  /** @deprecated the wire response does not include a separate total distinct from `agentClicks`. */
+  totalAgentClicks?: number;
+  periodDays?: number;
 }
 
 // ─── Affiliate ───────────────────────────────────────────────────────────────
@@ -569,9 +697,11 @@ export interface AffiliateProgram {
 export interface CreateAffiliateProgramOptions {
   name: string;
   description?: string;
-  commissionType: 'cpc' | 'cpa_return' | 'both';
+  /** @deprecated the platform accepts a single `commissionRate` — kept optional for compat. */
+  commissionType?: 'cpc' | 'cpa_return' | 'both';
   cpcRate?: number;
   cpaRate?: number;
+  commissionRate?: number;
   cookieDays?: number;
 }
 

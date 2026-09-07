@@ -1,4 +1,5 @@
-import type { HttpClient } from "../http.js";
+import type { HttpClient, RequestOptions } from "../http.js";
+import { paths } from "../paths.js";
 import type { CreateWebhookOptions, UpdateWebhookOptions, Webhook } from "../types.js";
 
 export class WebhooksResource {
@@ -7,18 +8,26 @@ export class WebhooksResource {
   /**
    * Get all available webhook event types and their descriptions.
    */
-  async listEventTypes(): Promise<{ eventTypes: string[]; descriptions: Record<string, string> }> {
-    return this.http.get<{ eventTypes: string[]; descriptions: Record<string, string> }>(
-      "/api/webhooks/event-types",
+  async listEventTypes(
+    options?: RequestOptions,
+  ): Promise<{ eventTypes: string[]; descriptions?: Record<string, string> }> {
+    return this.http.get<{ eventTypes: string[]; descriptions?: Record<string, string> }>(
+      paths.webhooks.eventTypes,
+      undefined,
+      options,
     );
   }
 
   /**
    * List all webhooks for the authenticated user.
    */
-  async list(): Promise<{ webhooks: Webhook[]; limit: number; used: number }> {
-    return this.http.get<{ webhooks: Webhook[]; limit: number; used: number }>(
-      "/api/webhooks",
+  async list(
+    options?: RequestOptions,
+  ): Promise<{ webhooks: Webhook[]; limit: number; used?: number }> {
+    return this.http.get<{ webhooks: Webhook[]; limit: number; used?: number }>(
+      paths.webhooks.base,
+      undefined,
+      options,
     );
   }
 
@@ -27,21 +36,25 @@ export class WebhooksResource {
    *
    * @param opts - Webhook creation options
    */
-  async create(opts: CreateWebhookOptions): Promise<Webhook> {
-    return this.http.post<Webhook>("/api/webhooks", opts);
+  async create(opts: CreateWebhookOptions, options?: RequestOptions): Promise<Webhook> {
+    return this.http.post<Webhook>(paths.webhooks.base, opts, options);
   }
 
   /**
    * Update an existing webhook.
    *
+   * Note: unlike list/create/delete/test, this action has no `/api/v1/`
+   * twin on the platform — it stays on the unversioned route.
+   *
    * @param webhookId - The ID of the webhook to update
    * @param opts - Fields to update
    */
-  async update(webhookId: string, opts: UpdateWebhookOptions): Promise<Webhook> {
-    return this.http.patch<Webhook>(
-      `/api/webhooks/${encodeURIComponent(webhookId)}`,
-      opts,
-    );
+  async update(
+    webhookId: string,
+    opts: UpdateWebhookOptions,
+    options?: RequestOptions,
+  ): Promise<Webhook> {
+    return this.http.patch<Webhook>(paths.webhooks.byIdForUpdate(webhookId), opts, options);
   }
 
   /**
@@ -49,10 +62,8 @@ export class WebhooksResource {
    *
    * @param webhookId - The ID of the webhook to delete
    */
-  async delete(webhookId: string): Promise<{ success: boolean }> {
-    return this.http.delete<{ success: boolean }>(
-      `/api/webhooks/${encodeURIComponent(webhookId)}`,
-    );
+  async delete(webhookId: string, options?: RequestOptions): Promise<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(paths.webhooks.byId(webhookId), options);
   }
 
   /**
@@ -64,10 +75,12 @@ export class WebhooksResource {
   async test(
     webhookId: string,
     eventType: string,
-  ): Promise<{ success: boolean; statusCode?: number; responseTime?: number }> {
-    return this.http.post<{ success: boolean; statusCode?: number; responseTime?: number }>(
-      `/api/webhooks/${encodeURIComponent(webhookId)}/test`,
+    options?: RequestOptions,
+  ): Promise<{ success: boolean; statusCode?: number; durationMs?: number }> {
+    return this.http.post<{ success: boolean; statusCode?: number; durationMs?: number }>(
+      paths.webhooks.test(webhookId),
       { eventType },
+      options,
     );
   }
 }

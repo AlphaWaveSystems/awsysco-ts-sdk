@@ -43,13 +43,11 @@ async function main() {
 
   // ─── Me ───────────────────────────────────────────────────────────────────
   console.log("── Me ──");
-  let userId = "";
   await test("me.get() returns uid + email + tier", async () => {
     const me = await client.me.get();
     if (!me.uid) throw new Error("uid missing");
     if (!me.email) throw new Error("email missing");
     if (!me.subscriptionTier) throw new Error("subscriptionTier missing");
-    userId = me.uid;
     console.log(`     uid=${me.uid} tier=${me.subscriptionTier}`);
   });
 
@@ -174,7 +172,7 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("Fatal:", err.message);
+main().catch((err: unknown) => {
+  console.error("Fatal:", err instanceof Error ? err.message : err);
   process.exit(1);
 });
