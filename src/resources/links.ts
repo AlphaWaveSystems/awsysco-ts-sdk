@@ -60,6 +60,36 @@ export class LinksResource {
   }
 
   /**
+   * Async-iterate over every link, paging automatically. `limit` (per page)
+   * is clamped to 100. Stops when the platform reports `hasMore: false`, or
+   * when a page comes back short/empty — guarding against a missing
+   * `hasMore` in the response.
+   *
+   * @example
+   * ```typescript
+   * for await (const link of client.links.listAll()) {
+   *   console.log(link.shortCode);
+   * }
+   * ```
+   */
+  async *listAll(opts?: ListLinksOptions): AsyncGenerator<Link, void, void> {
+    const limit =
+      opts?.limit !== undefined ? Math.min(opts.limit, MAX_LIST_LIMIT) : MAX_LIST_LIMIT;
+    let offset = opts?.offset ?? 0;
+
+    while (true) {
+      const page = await this.list({ limit, offset });
+      for (const link of page.data) {
+        yield link;
+      }
+      if (!page.hasMore || page.data.length < limit || page.data.length === 0) {
+        return;
+      }
+      offset += limit;
+    }
+  }
+
+  /**
    * Get a single link by its short code or full path.
    *
    * @param shortPath - The short code (e.g. "abc123") or namespaced path (e.g. "ns/slug")
