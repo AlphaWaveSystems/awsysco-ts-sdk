@@ -26,14 +26,18 @@ export interface AwsysClientConfig {
 // ─── Pagination ──────────────────────────────────────────────────────────────
 
 /**
- * Note: there is no `total` field — the platform does not return a total
- * count across all pages, only whether more pages exist (`hasMore`).
+ * The platform does not return a total count across all pages, only whether
+ * more pages exist (`hasMore`) — `total` is kept only for backward
+ * compatibility (ADR-014: minors never drop a public field) and is always
+ * `undefined`. Use `hasMore` instead.
  */
 export interface PaginatedResponse<T> {
   data: T[];
   limit: number;
   offset: number;
   hasMore: boolean;
+  /** @deprecated Always `undefined` since 1.4.0 — the platform never returns a total. Use `hasMore`. */
+  total?: number;
 }
 
 export interface PaginationParams {
