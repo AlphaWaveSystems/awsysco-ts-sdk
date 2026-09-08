@@ -241,13 +241,16 @@ export interface LinkStats {
 export interface AggregateAnalytics {
   shortCode: string;
   fullPath: string | null;
-  period: string;
   totalClicks: number;
-  uniqueVisitors: number;
-  clicksByDay: { date: string; clicks: number }[];
+  /** Always present — mapped from the wire's `byCountry`, `{}` if absent. */
   countryBreakdown: Record<string, number>;
-  tierLimit: number;
-  tier: string;
+  /** Always present — mapped from the wire's `byDay` (a date→count record), `[]` if absent. */
+  clicksByDay: { date: string; clicks: number }[];
+  /** Not present on every response (e.g. free-tier) — verified live, contract fixture 1.0.7. */
+  period?: string;
+  uniqueVisitors?: number;
+  tierLimit?: number;
+  tier?: string;
   deviceBreakdown?: { mobile: number; desktop: number; tablet: number };
   referrerBreakdown?: Record<string, number>;
   browserBreakdown?: Record<string, number>;
@@ -315,7 +318,6 @@ export interface BulkCreateOptions {
 }
 
 export interface BulkLinkResult {
-  index: number;
   url: string;
   success: boolean;
   shortUrl?: string;
@@ -323,9 +325,16 @@ export interface BulkLinkResult {
   error?: string;
 }
 
-export interface BulkCreateResult {
+/** `created`/`failed`/`total` live under `summary` on the wire — not top-level. */
+export interface BulkCreateSummary {
+  total: number;
   created: number;
   failed: number;
+}
+
+export interface BulkCreateResult {
+  success: boolean;
+  summary: BulkCreateSummary;
   results: BulkLinkResult[];
 }
 
@@ -372,6 +381,16 @@ export interface UserProfile {
 
 export interface UpdateProfileOptions {
   displayName?: string;
+}
+
+/**
+ * Response from `client.profile.update()` — distinct from {@link UserProfile}
+ * (`client.profile.get()`'s return type), since the update response does
+ * NOT echo back `uid`/`email` — verified against contract fixture 1.0.9.
+ */
+export interface UpdateProfileResult {
+  success: boolean;
+  displayName?: string | null;
 }
 
 // ─── Usage ───────────────────────────────────────────────────────────────────
@@ -532,8 +551,9 @@ export interface NamespaceInfo {
 export interface NamespaceCheckResult {
   namespace: string;
   available: boolean;
-  reason: string | null;
-  previewUrl: string | null;
+  /** Not present on every response — verified against contract fixture 1.0.9. */
+  reason?: string | null;
+  previewUrl?: string | null;
 }
 
 // ─── UTM Templates ───────────────────────────────────────────────────────────
@@ -541,32 +561,34 @@ export interface NamespaceCheckResult {
 export interface UtmTemplate {
   id: string;
   name: string;
-  /** @deprecated prefer `utmSource` (the wire field) — kept for compat, mapped from it. */
-  source: string | undefined;
-  /** @deprecated prefer `utmMedium` (the wire field) — kept for compat, mapped from it. */
-  medium: string | undefined;
-  /** @deprecated prefer `utmCampaign` (the wire field) — kept for compat, mapped from it. */
-  campaign: string | undefined;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
+  /** The platform's own field name (contract fixture 1.0.9) — was previously, incorrectly, thought to be `utmSource`. */
+  source?: string;
+  medium?: string;
+  campaign?: string;
   term?: string;
   content?: string;
+  /** @deprecated legacy alias for `source` — never the platform's actual field name. Kept for compat (ADR-014), mapped from `source`. */
+  utmSource?: string;
+  /** @deprecated legacy alias for `medium`. */
+  utmMedium?: string;
+  /** @deprecated legacy alias for `campaign`. */
+  utmCampaign?: string;
 }
 
 export interface CreateUtmTemplateOptions {
   name: string;
-  /** @deprecated use `utmSource` — the platform reads `utmSource`, not `source`. Kept for compat; ignored if `utmSource` is also set. */
+  /** The platform reads `source` (contract fixture 1.0.9) — `source`/`medium`/`campaign` take precedence over the deprecated `utmSource`/`utmMedium`/`utmCampaign` aliases below when both are set. */
   source?: string;
-  /** @deprecated use `utmMedium`. */
   medium?: string;
-  /** @deprecated use `utmCampaign`. */
   campaign?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
   term?: string;
   content?: string;
+  /** @deprecated legacy alias for `source` — the platform does NOT read `utmSource`; this was a prior (incorrect) belief. Kept for compat (ADR-014). */
+  utmSource?: string;
+  /** @deprecated legacy alias for `medium`. */
+  utmMedium?: string;
+  /** @deprecated legacy alias for `campaign`. */
+  utmCampaign?: string;
 }
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
@@ -644,21 +666,29 @@ export interface UpdateSavedViewOptions {
 
 export interface CustomDomain {
   domain: string;
-  status: 'pending_txt' | 'verified' | 'active' | 'inactive';
+  /**
+   * Not present on every response (`update()`'s response omits it
+   * entirely), and the wire uses `'pending'`, not `'pending_txt'` — verified
+   * against contract fixture 1.0.9. Kept as a broad `string` rather than a
+   * narrow union since the full set of real values isn't confirmed.
+   */
+  status?: string;
+  verified?: boolean;
   verificationToken?: string;
   txtRecord?: { name: string; type: string; value: string };
   cnameRecord?: { name: string; type: string; value: string };
   isDefault?: boolean;
   linkCount?: number;
   createdAt?: string;
+  defaultRedirect?: string;
+  notFoundHtml?: string;
 }
 
 export interface AddDomainResult {
   domain: string;
   status: string;
-  verificationToken: string;
-  txtRecord: { name: string; type: string; value: string };
-  cnameRecord: { name: string; type: string; value: string };
+  /** DNS records the caller must add to verify the domain — verified against contract fixture 1.0.9. */
+  dnsRecords: { type: string; name: string; value: string }[];
 }
 
 // ─── Agentlink ───────────────────────────────────────────────────────────────
@@ -686,11 +716,13 @@ export interface AffiliateProgram {
   id: string;
   name: string;
   description?: string;
-  commissionType: 'cpc' | 'cpa_return' | 'both';
+  /** Not present on every response (create/list/get/update/discover all omit it in practice) — verified against contract fixture 1.0.7. */
+  commissionType?: 'cpc' | 'cpa_return' | 'both';
   cpcRate?: number;
   cpaRate?: number;
   cookieDays?: number;
-  status: string;
+  /** Not present on every response — see `commissionType`. */
+  status?: string;
   createdAt?: string;
 }
 
@@ -707,7 +739,8 @@ export interface CreateAffiliateProgramOptions {
 
 export interface AffiliatePartner {
   id: string;
-  partnerId: string;
+  /** Not present on every response (list/updateStatus omit it) — verified against contract fixture 1.0.7. */
+  partnerId?: string;
   email?: string;
   status: string;
   partnerCode?: string;
@@ -719,6 +752,7 @@ export interface AffiliatePartnership {
   programId: string;
   programName?: string;
   partnerCode?: string;
-  status: string;
+  /** Not present on every response (list omits it) — verified against contract fixture 1.0.7. */
+  status?: string;
   joinedAt?: string;
 }

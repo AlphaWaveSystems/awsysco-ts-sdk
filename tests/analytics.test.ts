@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { AwsysClient } from "../src/index.js";
 import { AnalyticsResource } from "../src/resources/analytics.js";
 import type { HttpClient } from "../src/http.js";
-import type { AggregateAnalytics } from "../src/types.js";
 
 function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
   return {
@@ -84,17 +83,18 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
   });
 
   it("GETs the aggregate path with the period query and parses a paid-tier response", async () => {
-    const expected: AggregateAnalytics = {
+    // Wire response nests country/day breakdowns under byCountry/byDay (a
+    // date→count record) — verified against contract fixture 1.0.9's
+    // aggregate_stats scenario. The resource maps these to the type's
+    // countryBreakdown/clicksByDay (ADR-019).
+    vi.mocked(http.get).mockResolvedValue({
       shortCode: "abc123",
       fullPath: "acme/abc123",
       period: "30d",
       totalClicks: 540,
       uniqueVisitors: 410,
-      clicksByDay: [
-        { date: "2026-06-26", clicks: 20 },
-        { date: "2026-06-27", clicks: 30 },
-      ],
-      countryBreakdown: { US: 300, DE: 120, CA: 120 },
+      byDay: { "2026-06-26": 20, "2026-06-27": 30 },
+      byCountry: { US: 300, DE: 120, CA: 120 },
       tierLimit: 90,
       tier: "pro",
       deviceBreakdown: { mobile: 200, desktop: 300, tablet: 40 },
@@ -108,8 +108,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
         mediums: { email: 80 },
         campaigns: { launch: 80 },
       },
-    };
-    vi.mocked(http.get).mockResolvedValue(expected);
+    });
 
     const result = await analytics.getAggregateStats("abc123", { period: "30d" });
 
@@ -118,7 +117,11 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
       { period: "30d" },
       { signal: undefined, timeoutMs: undefined },
     );
-    expect(result).toEqual(expected);
+    expect(result.clicksByDay).toEqual([
+      { date: "2026-06-26", clicks: 20 },
+      { date: "2026-06-27", clicks: 30 },
+    ]);
+    expect(result.countryBreakdown).toEqual({ US: 300, DE: 120, CA: 120 });
     expect(result.deviceBreakdown).toEqual({ mobile: 200, desktop: 300, tablet: 40 });
     expect(result.utmBreakdown?.campaigns.launch).toBe(80);
   });
@@ -130,8 +133,8 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
       period: "7d",
       totalClicks: 0,
       uniqueVisitors: 0,
-      clicksByDay: [],
-      countryBreakdown: {},
+      byDay: {},
+      byCountry: {},
       tierLimit: 7,
       tier: "free",
     });
@@ -154,8 +157,8 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
       period: "7d",
       totalClicks: 0,
       uniqueVisitors: 0,
-      clicksByDay: [],
-      countryBreakdown: {},
+      byDay: {},
+      byCountry: {},
       tierLimit: 7,
       tier: "free",
     });
@@ -170,27 +173,45 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
   });
 
   it("parses a free-tier response with countryBreakdown + upgradeForMore", async () => {
-    const expected: AggregateAnalytics = {
+    vi.mocked(http.get).mockResolvedValue({
       shortCode: "free99",
       fullPath: null,
       period: "7d",
       totalClicks: 12,
       uniqueVisitors: 10,
-      clicksByDay: [{ date: "2026-06-27", clicks: 12 }],
-      countryBreakdown: { US: 8, MX: 4 },
+      byDay: { "2026-06-27": 12 },
+      byCountry: { US: 8, MX: 4 },
       tierLimit: 7,
       tier: "free",
       upgradeForMore: {
         available: ["devices", "referrers", "browsers"],
         message: "Upgrade to Pro to unlock device, referrer, and browser breakdowns.",
       },
-    };
-    vi.mocked(http.get).mockResolvedValue(expected);
+    });
 
     const result = await analytics.getAggregateStats("free99", { period: "7d" });
 
     expect(result.upgradeForMore?.available).toContain("devices");
     expect(result.deviceBreakdown).toBeUndefined();
     expect(result.countryBreakdown).toEqual({ US: 8, MX: 4 });
+  });
+
+  it("defaults countryBreakdown/clicksByDay to empty when byCountry/byDay are absent (minimal fixture shape)", async () => {
+    // Matches contract fixture 1.0.9's actual aggregate_stats scenario,
+    // which omits period/uniqueVisitors/tierLimit/tier entirely.
+    vi.mocked(http.get).mockResolvedValue({
+      shortCode: "abc123",
+      fullPath: null,
+      totalClicks: 1,
+      byCountry: { MX: 1 },
+      byDay: { "2026-09-01": 1 },
+    });
+
+    const result = await analytics.getAggregateStats("abc123");
+
+    expect(result.countryBreakdown).toEqual({ MX: 1 });
+    expect(result.clicksByDay).toEqual([{ date: "2026-09-01", clicks: 1 }]);
+    expect(result.period).toBeUndefined();
+    expect(result.tier).toBeUndefined();
   });
 });

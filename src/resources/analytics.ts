@@ -22,6 +22,25 @@ function mapRecentClicksResult(raw: RecentClicksResult): RecentClicksResult {
   };
 }
 
+/**
+ * The wire response nests country/day breakdowns under `byCountry`/`byDay`
+ * (a date→count record for the latter) — not `countryBreakdown`/
+ * `clicksByDay` as the rest of the type's naming might suggest. Verified
+ * live, contract fixture 1.0.7's `aggregate_stats` scenario.
+ */
+interface RawAggregateAnalytics extends Omit<AggregateAnalytics, "countryBreakdown" | "clicksByDay"> {
+  byCountry?: Record<string, number>;
+  byDay?: Record<string, number>;
+}
+
+function mapAggregateAnalytics(raw: RawAggregateAnalytics): AggregateAnalytics {
+  return {
+    ...raw,
+    countryBreakdown: raw.byCountry ?? {},
+    clicksByDay: Object.entries(raw.byDay ?? {}).map(([date, clicks]) => ({ date, clicks })),
+  };
+}
+
 export class AnalyticsResource {
   constructor(private readonly http: HttpClient) {}
 
@@ -61,10 +80,12 @@ export class AnalyticsResource {
   ): Promise<AggregateAnalytics> {
     const params: Record<string, string | number> = {};
     if (opts?.period !== undefined) params.period = opts.period;
-    return this.http.get<AggregateAnalytics>(paths.links.aggregateStats(shortPath), params, {
-      signal: opts?.signal,
-      timeoutMs: opts?.timeoutMs,
-    });
+    const raw = await this.http.get<RawAggregateAnalytics>(
+      paths.links.aggregateStats(shortPath),
+      params,
+      { signal: opts?.signal, timeoutMs: opts?.timeoutMs },
+    );
+    return mapAggregateAnalytics(raw);
   }
 
   /**

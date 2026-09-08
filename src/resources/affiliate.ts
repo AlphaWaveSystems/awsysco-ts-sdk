@@ -208,11 +208,13 @@ export class AffiliateResource {
    */
   async getLimits(
     options?: RequestOptions,
-  ): Promise<{ tier: string; limits: Record<string, unknown>; usage: Record<string, unknown> }> {
-    return this.http.get<{ tier: string; limits: Record<string, unknown>; usage: Record<string, unknown> }>(
-      paths.affiliate.limits,
-      undefined,
-      options,
-    );
+  ): Promise<{
+    programs: { used: number; limit: number };
+    partnerships: { used: number; limit: number };
+  }> {
+    return this.http.get<{
+      programs: { used: number; limit: number };
+      partnerships: { used: number; limit: number };
+    }>(paths.affiliate.limits, undefined, options);
   }
 }

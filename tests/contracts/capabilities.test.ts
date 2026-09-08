@@ -210,7 +210,24 @@ describe("Contract: capabilities — analytics", () => {
     const s = mockScenario("aggregate_stats");
     const result = await client.analytics.getAggregateStats("abc123", { period: "7d" });
     expectRequestMatches(s);
-    expect(result).toMatchObject(s.response.body as object);
+    // The wire nests country/day breakdowns under byCountry/byDay (a
+    // date→count record) — assert through the declared type's field names
+    // (countryBreakdown/clicksByDay), not a blind toMatchObject against the
+    // raw body, which would pass even if the mapping were missing (ADR-019).
+    const body = s.response.body as {
+      shortCode: string;
+      fullPath: string | null;
+      totalClicks: number;
+      byCountry: Record<string, number>;
+      byDay: Record<string, number>;
+    };
+    expect(result.shortCode).toBe(body.shortCode);
+    expect(result.fullPath).toBe(body.fullPath);
+    expect(result.totalClicks).toBe(body.totalClicks);
+    expect(result.countryBreakdown).toEqual(body.byCountry);
+    expect(result.clicksByDay).toEqual(
+      Object.entries(body.byDay).map(([date, clicks]) => ({ date, clicks })),
+    );
   });
 
   it("recent_clicks", async () => {
@@ -233,6 +250,11 @@ describe("Contract: capabilities — profile", () => {
     const s = mockScenario("profile_update");
     const result = await client.profile.update({ displayName: "New" });
     expectRequestMatches(s);
+    // Response is {success, displayName} — no uid/email echoed back, unlike
+    // profile_get. update() has its own UpdateProfileResult type, distinct
+    // from UserProfile, rather than falsely claiming uid/email (ADR-019).
+    expect(result.success).toBe(true);
+    expect(result.displayName).toBe("New");
     expect(result).toEqual(s.response.body);
   });
 });
@@ -354,7 +376,19 @@ describe("Contract: capabilities — bulk / me / usage", () => {
       urls: [{ url: "https://a.example/" }, { url: "https://b.example/", customSlug: "b" }],
     });
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // Assert through the declared type's field names, not a blind toEqual —
+    // `created`/`failed`/`total` live under `summary` on the wire, not
+    // top-level, so the type must actually mirror that nesting (ADR-019).
+    const body = s.response.body as {
+      success: boolean;
+      summary: { total: number; created: number; failed: number };
+      results: unknown[];
+    };
+    expect(result.success).toBe(body.success);
+    expect(result.summary.total).toBe(body.summary.total);
+    expect(result.summary.created).toBe(body.summary.created);
+    expect(result.summary.failed).toBe(body.summary.failed);
+    expect(result.results).toEqual(body.results);
   });
 
   it("me", async () => {
@@ -446,23 +480,55 @@ describe("Contract: capabilities — savedViews", () => {
 });
 
 describe("Contract: capabilities — utmTemplates", () => {
-  it("utm_list_via_me (no dedicated list route — ADR-003)", async () => {
+  it("utm_list_via_me (BROKEN server-side — platform issue #831, no API-key list path today)", async () => {
     const s = mockScenario("utm_list_via_me");
     const result = await client.utmTemplates.list();
     expectRequestMatches(s);
-    expect(result).toEqual((s.response.body as { utmTemplates: unknown[] }).utmTemplates);
+    const templates = (s.response.body as { utmTemplates: { id: string; name: string }[] })
+      .utmTemplates;
+    expect(result).toHaveLength(templates.length);
+    expect(result[0]?.id).toBe(templates[0]?.id);
+    expect(result[0]?.name).toBe(templates[0]?.name);
   });
 
-  it("utm_create (normalizes to utmSource/utmMedium/utmCampaign)", async () => {
+  it("utm_create (source/medium/campaign — the platform's real field names, not utmSource/etc.)", async () => {
     const s = mockScenario("utm_create");
     const result = await client.utmTemplates.create({
+      name: "Launch",
+      source: "newsletter",
+      medium: "email",
+      campaign: "sept",
+    });
+    expectRequestMatches(s);
+    // Response nests under `template`, not flat top-level fields — assert
+    // through the resource's actual unwrapping/mapping, not a blind
+    // toEqual(response.body) (ADR-019).
+    const body = s.response.body as {
+      template: { id: string; name: string; source: string; medium: string; campaign: string };
+    };
+    expect(result.id).toBe(body.template.id);
+    expect(result.name).toBe(body.template.name);
+    expect(result.source).toBe(body.template.source);
+    expect(result.medium).toBe(body.template.medium);
+    expect(result.campaign).toBe(body.template.campaign);
+    // Deprecated legacy aliases still populated for compat (ADR-014).
+    expect(result.utmSource).toBe(body.template.source);
+    expect(result.utmMedium).toBe(body.template.medium);
+    expect(result.utmCampaign).toBe(body.template.campaign);
+  });
+
+  it("utm_create accepts the deprecated utmSource/utmMedium/utmCampaign aliases too", async () => {
+    const s = mockScenario("utm_create");
+    await client.utmTemplates.create({
       name: "Launch",
       utmSource: "newsletter",
       utmMedium: "email",
       utmCampaign: "sept",
     });
+    // The outgoing request must still use the real wire field names
+    // (source/medium/campaign) even when the caller used the deprecated
+    // alias names.
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
   });
 
   it("utm_delete", async () => {
@@ -526,6 +592,9 @@ describe("Contract: capabilities — customDomains", () => {
     const s = mockScenario("domains_list");
     const result = await client.customDomains.list();
     expectRequestMatches(s);
+    // Wire status is "pending", not the old "pending_txt"-only union
+    // (CustomDomain.status widened to `string` — ADR-019).
+    expect(result.domains[0]?.status).toBe("pending");
     expect(result).toEqual(s.response.body);
   });
 
@@ -549,6 +618,10 @@ describe("Contract: capabilities — customDomains", () => {
       defaultRedirect: "https://example.com/",
     });
     expectRequestMatches(s);
+    // Response omits `status` entirely — CustomDomain.status is optional
+    // for exactly this reason (ADR-019).
+    expect(result.status).toBeUndefined();
+    expect(result.defaultRedirect).toBe("https://example.com/");
     expect(result).toEqual(s.response.body);
   });
 
@@ -579,6 +652,10 @@ describe("Contract: capabilities — namespace", () => {
     const s = mockScenario("namespace_check");
     const result = await client.namespace.check("acme");
     expectRequestMatches(s);
+    // reason/previewUrl are absent here — both optional on
+    // NamespaceCheckResult for exactly this reason (ADR-019).
+    expect(result.reason).toBeUndefined();
+    expect(result.previewUrl).toBeUndefined();
     expect(result).toEqual(s.response.body);
   });
 
@@ -637,6 +714,10 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_partners_list");
     const result = await client.affiliate.listPartners("p1");
     expectRequestMatches(s);
+    // partnerId is absent on list items — optional on AffiliatePartner for
+    // exactly this reason (ADR-019).
+    expect(result[0]?.partnerId).toBeUndefined();
+    expect(result[0]?.status).toBe("pending");
     expect(result).toEqual((s.response.body as { partners: unknown[] }).partners);
   });
 
@@ -644,6 +725,8 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_partner_status");
     const result = await client.affiliate.updatePartnerStatus("p1", "pt1", "approved");
     expectRequestMatches(s);
+    expect(result.partnerId).toBeUndefined();
+    expect(result.status).toBe("approved");
     expect(result).toEqual(s.response.body);
   });
 
@@ -651,6 +734,10 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_discover");
     const result = await client.affiliate.discover(20);
     expectRequestMatches(s);
+    // commissionType/status are absent on discover items — optional on
+    // AffiliateProgram for exactly this reason (ADR-019).
+    expect(result[0]?.commissionType).toBeUndefined();
+    expect(result[0]?.status).toBeUndefined();
     expect(result).toEqual((s.response.body as { programs: unknown[] }).programs);
   });
 
@@ -686,7 +773,14 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_limits");
     const result = await client.affiliate.getLimits();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // The declared type previously claimed `{tier, limits, usage}`, which
+    // never existed on the wire — real shape is `{programs, partnerships}`
+    // (ADR-019). Assert through the corrected named fields, not a blind
+    // toEqual that would have passed against the old wrong type too.
+    expect(result.programs.used).toBe(s.response.body.programs.used);
+    expect(result.programs.limit).toBe(s.response.body.programs.limit);
+    expect(result.partnerships.used).toBe(s.response.body.partnerships.used);
+    expect(result.partnerships.limit).toBe(s.response.body.partnerships.limit);
   });
 });
 
