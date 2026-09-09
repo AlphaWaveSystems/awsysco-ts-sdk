@@ -69,15 +69,41 @@ exercised by a contract-fixture test). References below are to that contract's s
   unversioned routes, which have no `/api/v1/` equivalent.
 - `tags.add()` now sends `{tags: [...]}` (an array) — the platform never accepted the previous
   `{tag: "..."}` body shape (`folders.js:128`).
-- `utmTemplates.create()` now sends the platform's actual field names (`utmSource`/`utmMedium`/
-  `utmCampaign`) instead of `source`/`medium`/`campaign`, which the platform silently ignored; the
-  old field names are still accepted as input and normalized internally.
+- `utmTemplates.create()` now sends the platform's actual field names (`source`/`medium`/
+  `campaign`) instead of `utmSource`/`utmMedium`/`utmCampaign`, which the platform doesn't read;
+  the old field names are still accepted as input (deprecated aliases) and normalized internally.
+  `utmTemplates.list()` now calls the real `GET /api/user/utm-templates` route (platform issue
+  #833) instead of the earlier `/api/v1/me` workaround, which never actually included template
+  data via API key (ADR-003/ADR-020).
 - `affiliate.listPrograms()`/`listPartners()`/`discover()`/`listPartnerships()` previously
   returned the entire `{programs|partners|partnerships: [...]}` response envelope cast to an
   array (would throw on `.map()`/iteration at runtime); they now correctly unwrap the array.
 - `imports.start()`'s request body casing standardized to camelCase (`accessToken`, not
   `access_token`) to match the contract fixture — the platform actually accepts both, so this was
   not a functional break, just a correctness/consistency fix.
+- `affiliate.createProgram()`'s request shape corrected (ADR-026): the SDK previously sent a
+  single `commissionRate` field and an optional `commissionType`, but the platform has never
+  accepted `commissionRate` and always requires `commissionType` — every call omitting it already
+  400'd, so this path never actually worked. `commissionType` is now a required field (turning
+  that latent failure into a compile-time error instead of a guaranteed runtime one), and
+  `cookieDays` is renamed to the real wire field name, `cookieDurationDays`.
+- Several resource-layer type/response mismatches corrected after a full sweep for the pattern
+  that let the `commissionRate`/`utmTemplates` bugs above ship undetected — a resource method
+  returning a raw passthrough cast whose test only asserted `toEqual(response.body)`, which is
+  vacuously true regardless of whether the declared TypeScript type matches reality (ADR-019):
+  `bulk.create()` now correctly unwraps `summary.{created,failed,total}` (previously typed as
+  top-level fields that were always `undefined`); `analytics.getAggregateStats()` gains several
+  previously-missing fields (`period`, `botClicksExcluded`, `uniqueVisitors`, `deviceBreakdown`,
+  `referrerBreakdown`, `browserBreakdown`, `osBreakdown`, `tierLimit`, `tier`, `hourBreakdown`);
+  `trustScore.scan()`'s real field is `short`, not `shortCode`, and gains `source`/`createdAt`;
+  `namespace.get()` gains `namespaceData`/`canClaimSubdomain`/`canClaimCustomDomain` and drops the
+  phantom `upgradeRequired`; `links.get()`/`list()` gain `geoRestriction`/`routingRules`/`ogMeta`/
+  `isDisabled`/`disabledReason`, and `Link.short` — never actually returned by any endpoint — is
+  now optional instead of (incorrectly) required; `customDomains.list()` gains several real fields
+  including `verifiedAt` (replacing an incorrect boolean `verified`); `affiliate.getLimits()`,
+  `affiliate.discover()` (now returns the narrower, correct `AffiliateProgramSummary` instead of
+  the full `AffiliateProgram`, which it never actually populates — ADR-024), and
+  `AffiliatePartnership` all corrected to their real live shapes.
 
 ### Deprecated
 
