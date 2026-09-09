@@ -6,6 +6,7 @@ import type {
   AffiliatePartner,
   AffiliatePartnership,
   AffiliateProgram,
+  AffiliateProgramSummary,
   CreateAffiliateProgramOptions,
 } from "../types.js";
 
@@ -131,13 +132,22 @@ export class AffiliateResource {
    *
    * @param limit - Maximum number of programs to return
    */
+  /**
+   * Discover public affiliate programs run by other users.
+   *
+   * @remarks Returns `AffiliateProgramSummary`, not the full `AffiliateProgram`
+   * — discover() is a public listing of other users' programs, so it never
+   * includes `status` or owner-only fields (`merchantId`, `maxPartners`,
+   * `isPublic`, timestamps). Use `getProgram()`/`listPrograms()` for a
+   * program you own to get the full shape.
+   */
   async discover(
     limit?: number,
     options?: RequestOptions,
-  ): Promise<AffiliateProgram[]> {
+  ): Promise<AffiliateProgramSummary[]> {
     const params: Record<string, string | number> = {};
     if (limit !== undefined) params.limit = limit;
-    const raw = await this.http.get<{ programs: AffiliateProgram[] }>(
+    const raw = await this.http.get<{ programs: AffiliateProgramSummary[] }>(
       paths.affiliate.discover,
       params,
       options,

@@ -53,6 +53,7 @@ export type {
   AffiliatePartner,
   AffiliatePartnership,
   AffiliateProgram,
+  AffiliateProgramSummary,
   AgentClickEntry,
   AgentLinkStats,
   AggregateAnalytics,

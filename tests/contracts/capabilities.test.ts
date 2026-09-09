@@ -4,6 +4,27 @@ import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { AwsysClient } from "../../src/index.js";
 import { AwsysForbiddenError } from "../../src/errors.js";
+import { parseTimestamp } from "../../src/timestamps.js";
+
+/**
+ * Deep-equals `actual` against `raw` except for the named fields, which are
+ * compared against `parseTimestamp(raw[field])` instead — for scenarios
+ * whose fixture body carries a raw Firestore timestamp shape that the SDK
+ * correctly normalizes (ADR-017/ADR-024: a blind `toEqual(response.body)`
+ * doesn't survive that normalization, and shouldn't — it should assert
+ * through what the SDK actually returns).
+ */
+function toEqualWithTimestamps(
+  actual: unknown,
+  raw: Record<string, unknown>,
+  timestampFields: string[],
+): void {
+  const expected = { ...raw };
+  for (const field of timestampFields) {
+    if (field in expected) expected[field] = parseTimestamp(expected[field]);
+  }
+  expect(actual).toEqual(expected);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Overridable so CI's contract-drift workflow can run this same suite
@@ -742,7 +763,10 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_program_create");
     const result = await client.affiliate.createProgram({ name: "P", commissionRate: 10 });
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_programs_list (unwraps {programs:[]} envelope)", async () => {
@@ -770,14 +794,20 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_program_get");
     const result = await client.affiliate.getProgram("p1");
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_program_update", async () => {
     const s = mockScenario("affiliate_program_update");
     const result = await client.affiliate.updateProgram("p1", { name: "P2" });
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_program_stats", async () => {
@@ -807,14 +837,16 @@ describe("Contract: capabilities — affiliate", () => {
     expect(result).toEqual(s.response.body);
   });
 
-  it("affiliate_discover (unwraps {programs:[]} envelope)", async () => {
+  it("affiliate_discover (unwraps {programs:[]} envelope, returns AffiliateProgramSummary — ADR-024)", async () => {
     const s = mockScenario("affiliate_discover");
     const result = await client.affiliate.discover(20);
     expectRequestMatches(s);
-    // commissionType/status are absent on discover items — optional on
-    // AffiliateProgram for exactly this reason (ADR-019).
-    expect(result[0]?.commissionType).toBeUndefined();
-    expect(result[0]?.status).toBeUndefined();
+    // discover() is a public listing of OTHER users' programs — it returns
+    // AffiliateProgramSummary, a distinct, narrower type from the owned
+    // AffiliateProgram. commissionType IS present; status and every
+    // owner-only field are not part of this type at all (fixture 1.0.12).
+    expect(result[0]?.commissionType).toBe("cpa");
+    expect(result[0]).not.toHaveProperty("status");
     expect(result).toEqual((s.response.body as { programs: unknown[] }).programs);
   });
 
@@ -822,7 +854,10 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_join");
     const result = await client.affiliate.join("p9", "CODE");
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_partnerships_list (unwraps {partnerships:[]} envelope)", async () => {

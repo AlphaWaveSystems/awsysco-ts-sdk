@@ -793,7 +793,7 @@ export interface AffiliateProgram {
   // `commissionType`/`status` were previously (incorrectly) marked optional
   // based on a bad contract fixture — live staging shows both present on
   // every list()/get() entry, so reverted to required.
-  commissionType: 'cpc' | 'cpa_return' | 'both';
+  commissionType: 'cpc' | 'cpa' | 'cpa_return' | 'both';
   cpcRate?: number;
   cpaRate?: number;
   /** The real wire field name — verified live (was previously, incorrectly, `cookieDays`). */
@@ -807,11 +807,30 @@ export interface AffiliateProgram {
   updatedAt?: string;
 }
 
+/**
+ * The public subset of a program returned by `discover()` — a listing of
+ * OTHER users' programs, not the owner-level detail `AffiliateProgram`
+ * carries. Live-verified (fixture 1.0.12, ADR-024): `commissionType` is
+ * present here, but `status` and every owner-only field (`merchantId`,
+ * `maxPartners`, `isPublic`, timestamps) are absent — discover() never
+ * returns them, so they don't belong on this type.
+ */
+export interface AffiliateProgramSummary {
+  id: string;
+  name: string;
+  description?: string;
+  commissionType: 'cpc' | 'cpa' | 'cpa_return' | 'both';
+  cpcRate?: number;
+  cpaRate?: number;
+  cookieDurationDays?: number;
+  partnerCount?: number;
+}
+
 export interface CreateAffiliateProgramOptions {
   name: string;
   description?: string;
   /** @deprecated the platform accepts a single `commissionRate` — kept optional for compat. */
-  commissionType?: 'cpc' | 'cpa_return' | 'both';
+  commissionType?: 'cpc' | 'cpa' | 'cpa_return' | 'both';
   cpcRate?: number;
   cpaRate?: number;
   commissionRate?: number;
