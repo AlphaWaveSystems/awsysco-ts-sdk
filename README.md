@@ -389,7 +389,11 @@ await client.namespace.release();
 ### Affiliate
 
 ```typescript
-const program = await client.affiliate.createProgram({ name: "My Program", commissionRate: 10 });
+const program = await client.affiliate.createProgram({
+  name: "My Program",
+  commissionType: "cpc",
+  cpcRate: 0.5,
+});
 const programs = await client.affiliate.listPrograms();
 await client.affiliate.updateProgram(program.id, { name: "Renamed" });
 const stats = await client.affiliate.getProgramStats(program.id, "30d");

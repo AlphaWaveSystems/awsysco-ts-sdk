@@ -761,7 +761,12 @@ describe("Contract: capabilities — namespace", () => {
 describe("Contract: capabilities — affiliate", () => {
   it("affiliate_program_create", async () => {
     const s = mockScenario("affiliate_program_create");
-    const result = await client.affiliate.createProgram({ name: "P", commissionRate: 10 });
+    const result = await client.affiliate.createProgram({
+      name: "Launch Affiliate",
+      commissionType: "cpc",
+      cpcRate: 0.5,
+      cookieDurationDays: 30,
+    });
     expectRequestMatches(s);
     toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
       "createdAt",

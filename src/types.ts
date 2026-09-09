@@ -827,14 +827,22 @@ export interface AffiliateProgramSummary {
 }
 
 export interface CreateAffiliateProgramOptions {
+  /** 3-100 characters. */
   name: string;
   description?: string;
-  /** @deprecated the platform accepts a single `commissionRate` — kept optional for compat. */
-  commissionType?: 'cpc' | 'cpa' | 'cpa_return' | 'both';
+  /**
+   * The platform has never accepted a single `commissionRate` field — that
+   * was an incorrect assumption in an earlier version of this type, along
+   * with `commissionType` being optional. Required, since the server 400s
+   * without it (`functions/affiliate/index.js:135`, fixture 1.0.13).
+   */
+  commissionType: 'cpc' | 'cpa_return' | 'both';
+  /** Required if `commissionType` is `cpc` or `both`. Range: 0.01-10. */
   cpcRate?: number;
+  /** Required if `commissionType` is `cpa_return` or `both`. Range: 0.01-1000. */
   cpaRate?: number;
-  commissionRate?: number;
-  cookieDays?: number;
+  /** The real wire field name (was previously, incorrectly, `cookieDays`). Range: 1-365. */
+  cookieDurationDays?: number;
 }
 
 export interface AffiliatePartner {
