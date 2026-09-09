@@ -2,6 +2,7 @@ import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import { mapTimestampFields } from "../timestamps.js";
 import type {
+  AffiliateLimits,
   AffiliatePartner,
   AffiliatePartnership,
   AffiliateProgram,
@@ -9,7 +10,11 @@ import type {
 } from "../types.js";
 
 function mapAffiliateProgram(raw: AffiliateProgram): AffiliateProgram {
-  return mapTimestampFields(raw, ["createdAt"]);
+  return mapTimestampFields(raw, ["createdAt", "updatedAt"]);
+}
+
+function mapAffiliatePartnership(raw: AffiliatePartnership): AffiliatePartnership {
+  return mapTimestampFields(raw, ["createdAt", "updatedAt"]);
 }
 
 export class AffiliateResource {
@@ -153,7 +158,12 @@ export class AffiliateResource {
   ): Promise<AffiliatePartnership> {
     const body: Record<string, string> = {};
     if (partnerCode !== undefined) body.partnerCode = partnerCode;
-    return this.http.post<AffiliatePartnership>(paths.affiliate.join(programId), body, options);
+    const raw = await this.http.post<AffiliatePartnership>(
+      paths.affiliate.join(programId),
+      body,
+      options,
+    );
+    return mapAffiliatePartnership(raw);
   }
 
   /**
@@ -165,7 +175,7 @@ export class AffiliateResource {
       undefined,
       options,
     );
-    return raw.partnerships;
+    return (raw.partnerships ?? []).map(mapAffiliatePartnership);
   }
 
   /**
@@ -206,15 +216,7 @@ export class AffiliateResource {
   /**
    * Get affiliate tier limits and current usage.
    */
-  async getLimits(
-    options?: RequestOptions,
-  ): Promise<{
-    programs: { used: number; limit: number };
-    partnerships: { used: number; limit: number };
-  }> {
-    return this.http.get<{
-      programs: { used: number; limit: number };
-      partnerships: { used: number; limit: number };
-    }>(paths.affiliate.limits, undefined, options);
+  async getLimits(options?: RequestOptions): Promise<AffiliateLimits> {
+    return this.http.get<AffiliateLimits>(paths.affiliate.limits, undefined, options);
   }
 }

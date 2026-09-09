@@ -7,7 +7,7 @@ import type { AddDomainResult, CustomDomain } from "../types.js";
 let activateDeprecationWarned = false;
 
 function mapCustomDomain(raw: CustomDomain): CustomDomain {
-  return mapTimestampFields(raw, ["createdAt"]);
+  return mapTimestampFields(raw, ["createdAt", "updatedAt", "verifiedAt"]);
 }
 
 export class CustomDomainsResource {

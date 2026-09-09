@@ -16,6 +16,17 @@ export function parseTimestamp(value: unknown): unknown {
     return value;
   }
 
+  // A handful of endpoints (e.g. trust-scan's `createdAt`) return a raw
+  // epoch-milliseconds number instead of an ISO string or a Firestore
+  // object — verified live against staging, contract fixture 1.0.11.
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+    return value;
+  }
+
   if (value !== null && typeof value === "object") {
     const obj = value as Record<string, unknown>;
     const seconds = obj._seconds ?? obj.seconds;
