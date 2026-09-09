@@ -25,16 +25,20 @@ describe("TrustScoreResource", () => {
   });
 
   describe("scan", () => {
-    it("calls GET /api/link-scan/:short and returns the result, mapping legacy short/score/status aliases from the wire fields", async () => {
-      // Raw wire response — shortCode/trustScore/trustStatus/threats are
-      // the real platform fields (links.js:566-568); short/score/status are
-      // legacy aliases the SDK derives, not sent by the platform.
+    it("calls GET /api/link-scan/:short and returns the result, mapping legacy shortCode/score/status aliases from the real wire fields", async () => {
+      // Raw wire response — `short`/trustScore/trustStatus/threats are the
+      // real platform fields (verified live against staging, contract
+      // fixture 1.0.11); shortCode/score/status are legacy aliases the SDK
+      // derives, not sent by the platform (a prior fix had this backwards
+      // — ADR-022).
       const raw = {
-        shortCode: "abc123",
+        short: "abc123",
         trustScore: 95,
-        trustStatus: "safe" as const,
+        trustStatus: "safe",
         threats: [],
         scannedAt: "2026-06-01T12:00:00Z",
+        source: "gsb+heuristics",
+        createdAt: 1780000000000,
       };
       vi.mocked(http.get).mockResolvedValue(raw);
 
@@ -43,17 +47,18 @@ describe("TrustScoreResource", () => {
       expect(http.get).toHaveBeenCalledWith("/api/link-scan/abc123", undefined, undefined);
       expect(result).toEqual({
         ...raw,
-        short: "abc123",
+        shortCode: "abc123",
         score: 95,
         status: "safe",
+        createdAt: new Date(raw.createdAt).toISOString(),
       });
     });
 
-    it("handles unknown status with null score", async () => {
+    it("handles an unrecognized trustStatus value with null score", async () => {
       vi.mocked(http.get).mockResolvedValue({
-        shortCode: "abc123",
+        short: "abc123",
         trustScore: null,
-        trustStatus: "unknown" as const,
+        trustStatus: "unknown",
         threats: [],
         scannedAt: null,
       });
@@ -67,9 +72,9 @@ describe("TrustScoreResource", () => {
 
     it("URL-encodes namespaced short paths", async () => {
       vi.mocked(http.get).mockResolvedValue({
-        shortCode: "ns/slug",
+        short: "ns/slug",
         trustScore: 80,
-        trustStatus: "safe" as const,
+        trustStatus: "safe",
         threats: [],
         scannedAt: null,
       });

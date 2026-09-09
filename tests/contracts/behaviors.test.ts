@@ -403,7 +403,11 @@ describe("Contract: behaviors — timestamp_variants", () => {
     expect(parseTimestamp(garbage)).toBe(garbage);
     expect(parseTimestamp(null)).toBe(null);
     expect(parseTimestamp(undefined)).toBe(undefined);
-    expect(parseTimestamp(42)).toBe(42);
+  });
+
+  it("parses a plain epoch-milliseconds number to an ISO string (e.g. trust-scan's createdAt)", () => {
+    expect(parseTimestamp(42)).toBe(new Date(42).toISOString());
+    expect(parseTimestamp(1788950303155)).toBe(new Date(1788950303155).toISOString());
   });
 
   it("timestamp_never_raises: never throws for malformed/out-of-range shapes", () => {

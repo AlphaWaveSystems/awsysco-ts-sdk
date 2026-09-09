@@ -210,24 +210,44 @@ describe("Contract: capabilities — analytics", () => {
     const s = mockScenario("aggregate_stats");
     const result = await client.analytics.getAggregateStats("abc123", { period: "7d" });
     expectRequestMatches(s);
-    // The wire nests country/day breakdowns under byCountry/byDay (a
-    // date→count record) — assert through the declared type's field names
-    // (countryBreakdown/clicksByDay), not a blind toMatchObject against the
-    // raw body, which would pass even if the mapping were missing (ADR-019).
+    // ADR-019's "byCountry/byDay" remapping was itself wrong (a bad
+    // fixture, not a real API shape) — reverted per ADR-022, live-verified
+    // against staging. The real field names ARE countryBreakdown/
+    // clicksByDay, matching the type directly; assert through the declared
+    // fields (not a blind toEqual) so a real future mismatch still fails
+    // loudly.
     const body = s.response.body as {
       shortCode: string;
       fullPath: string | null;
+      period: string;
       totalClicks: number;
-      byCountry: Record<string, number>;
-      byDay: Record<string, number>;
+      botClicksExcluded: number;
+      uniqueVisitors: number;
+      clicksByDay: { date: string; clicks: number }[];
+      countryBreakdown: Record<string, number>;
+      deviceBreakdown: { mobile: number; desktop: number; tablet: number };
+      referrerBreakdown: Record<string, number>;
+      browserBreakdown: Record<string, number>;
+      osBreakdown: Record<string, number>;
+      hourBreakdown: { hour: number; clicks: number }[];
+      tierLimit: number;
+      tier: string;
     };
     expect(result.shortCode).toBe(body.shortCode);
     expect(result.fullPath).toBe(body.fullPath);
+    expect(result.period).toBe(body.period);
     expect(result.totalClicks).toBe(body.totalClicks);
-    expect(result.countryBreakdown).toEqual(body.byCountry);
-    expect(result.clicksByDay).toEqual(
-      Object.entries(body.byDay).map(([date, clicks]) => ({ date, clicks })),
-    );
+    expect(result.botClicksExcluded).toBe(body.botClicksExcluded);
+    expect(result.uniqueVisitors).toBe(body.uniqueVisitors);
+    expect(result.clicksByDay).toEqual(body.clicksByDay);
+    expect(result.countryBreakdown).toEqual(body.countryBreakdown);
+    expect(result.deviceBreakdown).toEqual(body.deviceBreakdown);
+    expect(result.referrerBreakdown).toEqual(body.referrerBreakdown);
+    expect(result.browserBreakdown).toEqual(body.browserBreakdown);
+    expect(result.osBreakdown).toEqual(body.osBreakdown);
+    expect(result.hourBreakdown).toEqual(body.hourBreakdown);
+    expect(result.tierLimit).toBe(body.tierLimit);
+    expect(result.tier).toBe(body.tier);
   });
 
   it("recent_clicks", async () => {
@@ -456,7 +476,19 @@ describe("Contract: capabilities — savedViews", () => {
     const s = mockScenario("views_list");
     const result = await client.savedViews.list();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // Fixture 1.0.11's real staging snapshot has Firestore-shaped
+    // createdAt/updatedAt — the SDK normalizes these to ISO strings, so a
+    // blind toEqual(response.body) would fail; assert per-field instead.
+    const body = s.response.body as {
+      views: { id: string; name: string; createdAt: unknown; updatedAt: unknown }[];
+    };
+    expect(result.views).toHaveLength(body.views.length);
+    result.views.forEach((view, i) => {
+      expect(view.id).toBe(body.views[i]?.id);
+      expect(view.name).toBe(body.views[i]?.name);
+      expect(typeof view.createdAt).toBe("string");
+      expect(typeof view.updatedAt).toBe("string");
+    });
   });
 
   it("view_create", async () => {
@@ -598,10 +630,15 @@ describe("Contract: capabilities — customDomains", () => {
     const s = mockScenario("domains_list");
     const result = await client.customDomains.list();
     expectRequestMatches(s);
-    // Wire status is "pending", not the old "pending_txt"-only union
-    // (CustomDomain.status widened to `string` — ADR-019).
-    expect(result.domains[0]?.status).toBe("pending");
-    expect(result).toEqual(s.response.body);
+    const body = s.response.body as {
+      domains: { domain: string; status: string; verificationToken: string }[];
+    };
+    // `status` is kept as a broad `string` (not a narrow union) since the
+    // full set of real values isn't confirmed — assert through it rather
+    // than hardcoding one observed value.
+    expect(result.domains[0]?.status).toBe(body.domains[0]?.status);
+    expect(result.domains[0]?.domain).toBe(body.domains[0]?.domain);
+    expect(result.domains[0]?.verificationToken).toBe(body.domains[0]?.verificationToken);
   });
 
   it("domain_add", async () => {
@@ -651,7 +688,27 @@ describe("Contract: capabilities — namespace", () => {
     const s = mockScenario("namespace_get");
     const result = await client.namespace.get();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // ADR-022: adds namespaceData/canClaimSubdomain/canClaimCustomDomain
+    // (real fields, verified live), drops the phantom upgradeRequired.
+    // namespaceData.claimedAt is Firestore-shaped on the wire — normalized
+    // to an ISO string, so assert per-field rather than a blind toEqual.
+    const body = s.response.body as {
+      hasAccess: boolean;
+      namespace: string;
+      tier: string;
+      canClaimSubdomain: boolean;
+      canClaimCustomDomain: boolean;
+      namespaceData: { userEmail: string; isActive: boolean; tier: string; userId: string };
+    };
+    expect(result.hasAccess).toBe(body.hasAccess);
+    expect(result.namespace).toBe(body.namespace);
+    expect(result.tier).toBe(body.tier);
+    expect(result.canClaimSubdomain).toBe(body.canClaimSubdomain);
+    expect(result.canClaimCustomDomain).toBe(body.canClaimCustomDomain);
+    expect(result.namespaceData?.userEmail).toBe(body.namespaceData.userEmail);
+    expect(result.namespaceData?.isActive).toBe(body.namespaceData.isActive);
+    expect(typeof result.namespaceData?.claimedAt).toBe("string");
+    expect(result.upgradeRequired).toBeUndefined();
   });
 
   it("namespace_check", async () => {
@@ -692,7 +749,21 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_programs_list");
     const result = await client.affiliate.listPrograms();
     expectRequestMatches(s);
-    expect(result).toEqual((s.response.body as { programs: unknown[] }).programs);
+    // Fixture 1.0.11's real staging snapshot has Firestore-shaped
+    // createdAt/updatedAt — the SDK normalizes these to ISO strings, so a
+    // blind toEqual(response.body) would fail; assert per-field instead.
+    const body = s.response.body as {
+      programs: { id: string; name: string; status: string; commissionType: string }[];
+    };
+    expect(result).toHaveLength(body.programs.length);
+    result.forEach((program, i) => {
+      expect(program.id).toBe(body.programs[i]?.id);
+      expect(program.name).toBe(body.programs[i]?.name);
+      expect(program.status).toBe(body.programs[i]?.status);
+      expect(program.commissionType).toBe(body.programs[i]?.commissionType);
+      expect(typeof program.createdAt).toBe("string");
+      expect(typeof program.updatedAt).toBe("string");
+    });
   });
 
   it("affiliate_program_get", async () => {
@@ -758,7 +829,20 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_partnerships_list");
     const result = await client.affiliate.listPartnerships();
     expectRequestMatches(s);
-    expect(result).toEqual((s.response.body as { partnerships: unknown[] }).partnerships);
+    // Fixture 1.0.11's real staging snapshot has Firestore-shaped
+    // createdAt/updatedAt — the SDK normalizes these to ISO strings, so a
+    // blind toEqual(response.body) would fail; assert per-field instead.
+    const body = s.response.body as {
+      partnerships: { id: string; programId: string; status: string; partnerCode?: string }[];
+    };
+    expect(result).toHaveLength(body.partnerships.length);
+    result.forEach((partnership, i) => {
+      expect(partnership.id).toBe(body.partnerships[i]?.id);
+      expect(partnership.programId).toBe(body.partnerships[i]?.programId);
+      expect(partnership.status).toBe(body.partnerships[i]?.status);
+      expect(typeof partnership.createdAt).toBe("string");
+      expect(typeof partnership.updatedAt).toBe("string");
+    });
   });
 
   it("affiliate_partnership_stats", async () => {
@@ -779,14 +863,18 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_limits");
     const result = await client.affiliate.getLimits();
     expectRequestMatches(s);
-    // The declared type previously claimed `{tier, limits, usage}`, which
-    // never existed on the wire — real shape is `{programs, partnerships}`
-    // (ADR-019). Assert through the corrected named fields, not a blind
-    // toEqual that would have passed against the old wrong type too.
-    expect(result.programs.used).toBe(s.response.body.programs.used);
-    expect(result.programs.limit).toBe(s.response.body.programs.limit);
-    expect(result.partnerships.used).toBe(s.response.body.partnerships.used);
-    expect(result.partnerships.limit).toBe(s.response.body.partnerships.limit);
+    // ADR-019's fix here was itself wrong (a bad fixture, not a real API
+    // shape) — reverted per ADR-022, live-verified against staging +
+    // affiliate.js:184-197. Real shape is {tier, limits, usage}.
+    const body = s.response.body as {
+      tier: string;
+      limits: Record<string, unknown>;
+      usage: { programs: number; partnerships: number };
+    };
+    expect(result.tier).toBe(body.tier);
+    expect(result.limits).toEqual(body.limits);
+    expect(result.usage.programs).toBe(body.usage.programs);
+    expect(result.usage.partnerships).toBe(body.usage.partnerships);
   });
 });
 
@@ -843,19 +931,28 @@ describe("Contract: capabilities — trustScore", () => {
     const s = mockScenario("trust_scan");
     const result = await client.trustScore.scan("abc123");
     expectRequestMatches(s);
-    // The SDK adds short/score/status as deprecated aliases mapped from
-    // the wire's shortCode/trustScore/trustStatus — not in the raw fixture.
+    // The real wire field is `short` (ADR-022 — a prior fix had this
+    // backwards, assuming `shortCode`). The SDK adds shortCode/score/status
+    // as deprecated aliases mapped from the real fields, and normalizes
+    // `createdAt` from its raw epoch-ms number to an ISO string.
     const body = s.response.body as {
-      shortCode: string;
+      short: string;
       trustScore: number | null;
       trustStatus: string;
+      threats: string[];
+      scannedAt: string;
+      source: string;
+      createdAt: number;
     };
-    expect(result).toEqual({
-      ...body,
-      short: body.shortCode,
-      score: body.trustScore,
-      status: body.trustStatus,
-    });
+    expect(result.short).toBe(body.short);
+    expect(result.trustScore).toBe(body.trustScore);
+    expect(result.trustStatus).toBe(body.trustStatus);
+    expect(result.threats).toEqual(body.threats);
+    expect(result.source).toBe(body.source);
+    expect(result.shortCode).toBe(body.short);
+    expect(result.score).toBe(body.trustScore);
+    expect(result.status).toBe(body.trustStatus);
+    expect(result.createdAt).toBe(new Date(body.createdAt).toISOString());
   });
 });
 

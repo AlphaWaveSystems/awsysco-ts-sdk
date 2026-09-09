@@ -83,18 +83,22 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
   });
 
   it("GETs the aggregate path with the period query and parses a paid-tier response", async () => {
-    // Wire response nests country/day breakdowns under byCountry/byDay (a
-    // date→count record) — verified against contract fixture 1.0.9's
-    // aggregate_stats scenario. The resource maps these to the type's
-    // countryBreakdown/clicksByDay (ADR-019).
+    // Wire response uses countryBreakdown/clicksByDay directly — verified
+    // live against staging and contract fixture 1.0.11's aggregate_stats
+    // scenario. A prior fix (ADR-019) mistakenly remapped these from
+    // byCountry/byDay, which never actually existed on the wire; reverted
+    // (ADR-022). This is a blind passthrough, no mapping needed.
     vi.mocked(http.get).mockResolvedValue({
       shortCode: "abc123",
       fullPath: "acme/abc123",
       period: "30d",
       totalClicks: 540,
       uniqueVisitors: 410,
-      byDay: { "2026-06-26": 20, "2026-06-27": 30 },
-      byCountry: { US: 300, DE: 120, CA: 120 },
+      clicksByDay: [
+        { date: "2026-06-26", clicks: 20 },
+        { date: "2026-06-27", clicks: 30 },
+      ],
+      countryBreakdown: { US: 300, DE: 120, CA: 120 },
       tierLimit: 90,
       tier: "pro",
       deviceBreakdown: { mobile: 200, desktop: 300, tablet: 40 },
@@ -133,8 +137,8 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
       period: "7d",
       totalClicks: 0,
       uniqueVisitors: 0,
-      byDay: {},
-      byCountry: {},
+      clicksByDay: [],
+      countryBreakdown: {},
       tierLimit: 7,
       tier: "free",
     });
@@ -157,8 +161,8 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
       period: "7d",
       totalClicks: 0,
       uniqueVisitors: 0,
-      byDay: {},
-      byCountry: {},
+      clicksByDay: [],
+      countryBreakdown: {},
       tierLimit: 7,
       tier: "free",
     });
@@ -179,8 +183,8 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
       period: "7d",
       totalClicks: 12,
       uniqueVisitors: 10,
-      byDay: { "2026-06-27": 12 },
-      byCountry: { US: 8, MX: 4 },
+      clicksByDay: [{ date: "2026-06-27", clicks: 12 }],
+      countryBreakdown: { US: 8, MX: 4 },
       tierLimit: 7,
       tier: "free",
       upgradeForMore: {
@@ -196,15 +200,16 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
     expect(result.countryBreakdown).toEqual({ US: 8, MX: 4 });
   });
 
-  it("defaults countryBreakdown/clicksByDay to empty when byCountry/byDay are absent (minimal fixture shape)", async () => {
-    // Matches contract fixture 1.0.9's actual aggregate_stats scenario,
-    // which omits period/uniqueVisitors/tierLimit/tier entirely.
+  it("passes through a minimal response shape unchanged (blind cast, no mapping)", async () => {
+    // Matches contract fixture 1.0.11's actual aggregate_stats scenario
+    // shape directly — countryBreakdown/clicksByDay are the real field
+    // names, no remapping needed (ADR-022).
     vi.mocked(http.get).mockResolvedValue({
       shortCode: "abc123",
       fullPath: null,
       totalClicks: 1,
-      byCountry: { MX: 1 },
-      byDay: { "2026-09-01": 1 },
+      countryBreakdown: { MX: 1 },
+      clicksByDay: [{ date: "2026-09-01", clicks: 1 }],
     });
 
     const result = await analytics.getAggregateStats("abc123");
