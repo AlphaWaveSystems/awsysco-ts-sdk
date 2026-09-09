@@ -25,19 +25,18 @@ describe("UtmTemplatesResource", () => {
   });
 
   describe("list", () => {
-    it("calls GET /api/v1/me and returns utmTemplates array, mapping source/medium/campaign (the real wire fields) to the deprecated utmSource/etc. aliases", async () => {
-      // Raw wire response uses source/medium/campaign (the real platform
-      // fields, confirmed by contract fixture 1.0.9's utm_create scenario)
-      // — utmSource/utmMedium/utmCampaign are deprecated aliases the SDK
-      // derives, never sent by the platform.
+    it("calls GET /api/user/utm-templates and returns the templates array, mapping source/medium/campaign (the real wire fields) to the deprecated utmSource/etc. aliases", async () => {
+      // Platform issue #833 added a real list route — replaces the earlier
+      // ADR-003 workaround of reading /api/v1/me (which never actually
+      // included template data via API key).
       const rawTemplates = [
         { id: "t1", name: "Summer Campaign", source: "email", medium: "newsletter", campaign: "summer" },
       ];
-      vi.mocked(http.get).mockResolvedValue({ utmTemplates: rawTemplates });
+      vi.mocked(http.get).mockResolvedValue({ templates: rawTemplates });
 
       const result = await utmTemplates.list();
 
-      expect(http.get).toHaveBeenCalledWith("/api/v1/me", undefined, undefined);
+      expect(http.get).toHaveBeenCalledWith("/api/user/utm-templates", undefined, undefined);
       expect(result).toEqual([
         {
           ...rawTemplates[0],
@@ -48,29 +47,11 @@ describe("UtmTemplatesResource", () => {
       ]);
     });
 
-    it("returns empty array when utmTemplates is missing from response (platform issue #831 — this is the normal case via API key today)", async () => {
-      vi.mocked(http.get).mockResolvedValue({ uid: "user1", email: "a@b.com" });
+    it("returns empty array when templates is missing from response", async () => {
+      vi.mocked(http.get).mockResolvedValue({});
 
       const result = await utmTemplates.list();
       expect(result).toEqual([]);
-    });
-
-    it("warns once (not repeatedly) that list() is non-functional via API key", async () => {
-      vi.mocked(http.get).mockResolvedValue({});
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
-        await utmTemplates.list();
-        await utmTemplates.list();
-        const utmWarnings = warnSpy.mock.calls.filter((call) =>
-          String(call[0]).includes("utmTemplates.list()"),
-        );
-        // Warns at most once across this resource's lifetime (module-level
-        // flag) — a fresh instance in a later test may or may not still see
-        // it depending on suite ordering, so assert "not on every call".
-        expect(utmWarnings.length).toBeLessThanOrEqual(1);
-      } finally {
-        warnSpy.mockRestore();
-      }
     });
   });
 

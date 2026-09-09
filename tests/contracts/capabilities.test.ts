@@ -480,15 +480,21 @@ describe("Contract: capabilities — savedViews", () => {
 });
 
 describe("Contract: capabilities — utmTemplates", () => {
-  it("utm_list_via_me (BROKEN server-side — platform issue #831, no API-key list path today)", async () => {
-    const s = mockScenario("utm_list_via_me");
+  it("utm_list (GET /api/user/utm-templates, platform issue #833)", async () => {
+    const s = mockScenario("utm_list");
     const result = await client.utmTemplates.list();
     expectRequestMatches(s);
-    const templates = (s.response.body as { utmTemplates: { id: string; name: string }[] })
-      .utmTemplates;
-    expect(result).toHaveLength(templates.length);
-    expect(result[0]?.id).toBe(templates[0]?.id);
-    expect(result[0]?.name).toBe(templates[0]?.name);
+    const body = s.response.body as {
+      templates: { id: string; name: string; source: string; medium: string; campaign: string }[];
+    };
+    expect(result).toHaveLength(body.templates.length);
+    expect(result[0]?.id).toBe(body.templates[0]?.id);
+    expect(result[0]?.name).toBe(body.templates[0]?.name);
+    expect(result[0]?.source).toBe(body.templates[0]?.source);
+    expect(result[0]?.medium).toBe(body.templates[0]?.medium);
+    expect(result[0]?.campaign).toBe(body.templates[0]?.campaign);
+    // Deprecated legacy aliases still populated for compat (ADR-014).
+    expect(result[0]?.utmSource).toBe(body.templates[0]?.source);
   });
 
   it("utm_create (source/medium/campaign — the platform's real field names, not utmSource/etc.)", async () => {

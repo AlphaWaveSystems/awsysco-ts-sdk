@@ -12,8 +12,8 @@ interface RawUtmTemplate {
   content?: string;
 }
 
-interface MeResponse {
-  utmTemplates?: RawUtmTemplate[];
+interface ListUtmTemplatesResponse {
+  templates?: RawUtmTemplate[];
 }
 
 function mapUtmTemplate(raw: RawUtmTemplate): UtmTemplate {
@@ -27,34 +27,25 @@ function mapUtmTemplate(raw: RawUtmTemplate): UtmTemplate {
   };
 }
 
-let listWarned = false;
-
 export class UtmTemplatesResource {
   constructor(private readonly http: HttpClient) {}
 
   /**
    * List all UTM templates for the authenticated user.
    *
-   * @remarks **Currently non-functional via API key** (platform issue #831,
-   * not an SDK bug): no dedicated `GET /api/user/utm-templates` route
-   * exists, and `/api/v1/me` — the only endpoint this could piggyback on
-   * per ADR-003 — does not actually include `utmTemplates` in its
-   * response. This method will always return `[]` until #831 ships. The
-   * SDK does not throw, since the platform itself doesn't error here; it
-   * silently (and misleadingly) omits the data, so a one-shot console
-   * warning is the appropriate signal rather than an exception.
+   * @remarks Backed by `GET /api/user/utm-templates` (platform issue #833),
+   * replacing the earlier ADR-003 workaround of reading `/api/v1/me` (which
+   * never actually included template data via API key). As of fixture
+   * 1.0.10 this route is live on staging; production rollout is expected
+   * shortly after.
    */
   async list(options?: RequestOptions): Promise<UtmTemplate[]> {
-    if (!listWarned) {
-      listWarned = true;
-      console.warn(
-        "[@awsysco/sdk] utmTemplates.list() currently always returns an empty array: " +
-          "/api/v1/me does not include utmTemplates and no GET /api/user/utm-templates route " +
-          "exists via API key (platform issue #831). This is a server-side limitation, not an SDK bug.",
-      );
-    }
-    const me = await this.http.get<MeResponse>(paths.utmTemplates.viaMe, undefined, options);
-    return (me.utmTemplates ?? []).map(mapUtmTemplate);
+    const res = await this.http.get<ListUtmTemplatesResponse>(
+      paths.utmTemplates.list,
+      undefined,
+      options,
+    );
+    return (res.templates ?? []).map(mapUtmTemplate);
   }
 
   /**

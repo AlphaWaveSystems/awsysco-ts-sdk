@@ -1,6 +1,6 @@
 {
  "$schema": "awsys-sdk-contract/1",
- "version": "1.0.9",
+ "version": "1.0.10",
  "platformBaseline": "2026-09",
  "baseUrl": "https://awsys.co",
  "auth": {
@@ -835,26 +835,31 @@
    }
   },
   {
-   "id": "utm_list_via_me",
+   "id": "utm_list",
    "capability": "29",
    "request": {
     "method": "GET",
-    "path": "/api/v1/me",
+    "path": "/api/user/utm-templates",
     "query": {},
     "body": null
    },
    "response": {
     "status": 200,
     "body": {
-     "utmTemplates": [
+     "templates": [
       {
        "id": "t1",
-       "name": "Launch"
+       "name": "Launch",
+       "source": "newsletter",
+       "medium": "email",
+       "campaign": "sept",
+       "term": "",
+       "content": ""
       }
      ]
     }
    },
-   "note": "BROKEN: /api/v1/me does NOT return utmTemplates and no GET /api/user/utm-templates exists (issue #831). No API-key list path today."
+   "note": "GET /api/user/utm-templates (apiKeyAuth) added in #833 \u2014 live on staging, pending prod deploy; returns {templates:[\u2026]}"
   },
   {
    "id": "utm_create",
