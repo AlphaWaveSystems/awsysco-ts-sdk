@@ -145,8 +145,13 @@ export interface CreatedLink {
 export interface Link {
   /** Firestore document ID */
   id: string;
-  /** Short code (e.g. "abc123") */
-  short: string;
+  /**
+   * @deprecated never actually populated by the platform (neither
+   * `GET`/`POST /api/v1/links` return it) — kept optional for compat
+   * with pre-1.4.0 consumer code. Use `shortCode` instead. Was
+   * incorrectly typed as required until live-verified (ADR-022).
+   */
+  short?: string;
   /** Full path, including namespace if applicable (e.g. "ns/slug") */
   fullPath: string;
   /** Full short URL */
@@ -173,6 +178,16 @@ export interface Link {
   folderId?: string | null;
   /** Tags */
   tags?: string[];
+  /** Geographic access restrictions, if configured — verified live. */
+  geoRestriction?: GeoRestriction | null;
+  /** Country-based routing rules, if configured — verified live. */
+  routingRules?: RoutingRule[] | null;
+  /** Open Graph metadata overrides, if configured — verified live. */
+  ogMeta?: OgMeta | null;
+  /** Whether the link has been manually disabled — verified live. */
+  isDisabled?: boolean;
+  /** Reason the link was disabled, if applicable — verified live. */
+  disabledReason?: string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- kept as an interface (not a type alias) by design so it stays open to extension without a breaking change; currently identical to its supertype.
@@ -241,13 +256,15 @@ export interface LinkStats {
 export interface AggregateAnalytics {
   shortCode: string;
   fullPath: string | null;
-  period: string;
   totalClicks: number;
-  uniqueVisitors: number;
-  clicksByDay: { date: string; clicks: number }[];
   countryBreakdown: Record<string, number>;
-  tierLimit: number;
-  tier: string;
+  clicksByDay: { date: string; clicks: number }[];
+  /** Not present on every response (e.g. free-tier) — verified live against staging. */
+  period?: string;
+  botClicksExcluded?: boolean;
+  uniqueVisitors?: number;
+  tierLimit?: number;
+  tier?: string;
   deviceBreakdown?: { mobile: number; desktop: number; tablet: number };
   referrerBreakdown?: Record<string, number>;
   browserBreakdown?: Record<string, number>;
@@ -315,7 +332,6 @@ export interface BulkCreateOptions {
 }
 
 export interface BulkLinkResult {
-  index: number;
   url: string;
   success: boolean;
   shortUrl?: string;
@@ -323,9 +339,16 @@ export interface BulkLinkResult {
   error?: string;
 }
 
-export interface BulkCreateResult {
+/** `created`/`failed`/`total` live under `summary` on the wire — not top-level. */
+export interface BulkCreateSummary {
+  total: number;
   created: number;
   failed: number;
+}
+
+export interface BulkCreateResult {
+  success: boolean;
+  summary: BulkCreateSummary;
   results: BulkLinkResult[];
 }
 
@@ -372,6 +395,16 @@ export interface UserProfile {
 
 export interface UpdateProfileOptions {
   displayName?: string;
+}
+
+/**
+ * Response from `client.profile.update()` — distinct from {@link UserProfile}
+ * (`client.profile.get()`'s return type), since the update response does
+ * NOT echo back `uid`/`email` — verified against contract fixture 1.0.9.
+ */
+export interface UpdateProfileResult {
+  success: boolean;
+  displayName?: string | null;
 }
 
 // ─── Usage ───────────────────────────────────────────────────────────────────
@@ -505,19 +538,32 @@ export interface TagsResult {
 // ─── Trust Score ─────────────────────────────────────────────────────────────
 
 export interface TrustScoreResult {
-  /** @deprecated prefer `shortCode` (the wire field, links.js:566) — kept for compat, mapped from it. */
+  /**
+   * The real wire field (verified live — `short`, not `shortCode`; a prior
+   * fix had this backwards, ADR-022).
+   */
   short: string;
+  /** @deprecated the platform never actually returns `shortCode` here — kept optional for compat, mapped from `short`. */
+  shortCode?: string;
   /** @deprecated not present on the actual response. */
   long?: string;
-  /** @deprecated prefer `trustScore` (the wire field, links.js:567) — kept for compat, mapped from it. */
+  /** @deprecated prefer `trustScore` — kept for compat, mapped from it. */
   score: number | null;
-  /** @deprecated prefer `trustStatus` (the wire field, links.js:568) — kept for compat, mapped from it. */
-  status: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
-  shortCode: string;
   trustScore: number | null;
-  trustStatus: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  /** @deprecated prefer `trustStatus` — kept for compat, mapped from it. */
+  status: string | null;
+  /**
+   * A broad `string` rather than a narrow union — the platform's own docs
+   * disagree with each other (`"safe"/"warning"/"unsafe"` vs. an observed
+   * live value of `"trusted"`), so the full value set isn't confirmed.
+   */
+  trustStatus: string | null;
   threats: string[];
   scannedAt?: string | null;
+  /** The scan's source/provider, e.g. `"gsb+heuristics"` — verified live. */
+  source?: string;
+  /** Epoch-milliseconds on the wire, normalized to an ISO string — verified live. */
+  createdAt?: string | null;
 }
 
 // ─── Namespace ───────────────────────────────────────────────────────────────
@@ -526,14 +572,25 @@ export interface NamespaceInfo {
   hasAccess: boolean;
   namespace: string | null;
   tier: string;
+  /** @deprecated not present on the real response — kept optional for compat. */
   upgradeRequired?: boolean;
+  namespaceData?: {
+    userEmail?: string;
+    isActive?: boolean;
+    tier?: string;
+    userId?: string;
+    claimedAt?: string | null;
+  };
+  canClaimSubdomain?: boolean;
+  canClaimCustomDomain?: boolean;
 }
 
 export interface NamespaceCheckResult {
   namespace: string;
   available: boolean;
-  reason: string | null;
-  previewUrl: string | null;
+  /** Not present on every response — verified against contract fixture 1.0.9. */
+  reason?: string | null;
+  previewUrl?: string | null;
 }
 
 // ─── UTM Templates ───────────────────────────────────────────────────────────
@@ -541,32 +598,34 @@ export interface NamespaceCheckResult {
 export interface UtmTemplate {
   id: string;
   name: string;
-  /** @deprecated prefer `utmSource` (the wire field) — kept for compat, mapped from it. */
-  source: string | undefined;
-  /** @deprecated prefer `utmMedium` (the wire field) — kept for compat, mapped from it. */
-  medium: string | undefined;
-  /** @deprecated prefer `utmCampaign` (the wire field) — kept for compat, mapped from it. */
-  campaign: string | undefined;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
+  /** The platform's own field name (contract fixture 1.0.9) — was previously, incorrectly, thought to be `utmSource`. */
+  source?: string;
+  medium?: string;
+  campaign?: string;
   term?: string;
   content?: string;
+  /** @deprecated legacy alias for `source` — never the platform's actual field name. Kept for compat (ADR-014), mapped from `source`. */
+  utmSource?: string;
+  /** @deprecated legacy alias for `medium`. */
+  utmMedium?: string;
+  /** @deprecated legacy alias for `campaign`. */
+  utmCampaign?: string;
 }
 
 export interface CreateUtmTemplateOptions {
   name: string;
-  /** @deprecated use `utmSource` — the platform reads `utmSource`, not `source`. Kept for compat; ignored if `utmSource` is also set. */
+  /** The platform reads `source` (contract fixture 1.0.9) — `source`/`medium`/`campaign` take precedence over the deprecated `utmSource`/`utmMedium`/`utmCampaign` aliases below when both are set. */
   source?: string;
-  /** @deprecated use `utmMedium`. */
   medium?: string;
-  /** @deprecated use `utmCampaign`. */
   campaign?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
   term?: string;
   content?: string;
+  /** @deprecated legacy alias for `source` — the platform does NOT read `utmSource`; this was a prior (incorrect) belief. Kept for compat (ADR-014). */
+  utmSource?: string;
+  /** @deprecated legacy alias for `medium`. */
+  utmMedium?: string;
+  /** @deprecated legacy alias for `campaign`. */
+  utmCampaign?: string;
 }
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
@@ -644,15 +703,40 @@ export interface UpdateSavedViewOptions {
 
 export interface CustomDomain {
   domain: string;
-  status: 'pending_txt' | 'verified' | 'active' | 'inactive';
+  /**
+   * Not present on every response (`update()`'s response omits it
+   * entirely). Kept as a broad `string` rather than a narrow union since
+   * the full set of real values isn't confirmed (observed live:
+   * `"pending_txt"`, `"inactive"`).
+   */
+  status?: string;
+  /** @deprecated not present on the real response — see `verifiedAt`. */
+  verified?: boolean;
   verificationToken?: string;
   txtRecord?: { name: string; type: string; value: string };
   cnameRecord?: { name: string; type: string; value: string };
   isDefault?: boolean;
   linkCount?: number;
   createdAt?: string;
+  updatedAt?: string;
+  verifiedAt?: string | null;
+  userId?: string;
+  type?: string;
+  sslStatus?: string;
+  sslCertExpiresAt?: string | null;
+  stripeSubscriptionItemId?: string | null;
+  billingStartDate?: string | null;
+  lastError?: string | null;
+  defaultRedirect?: string;
+  notFoundHtml?: string;
 }
 
+/**
+ * `client.customDomains.add()`'s return type — verified live against
+ * staging and `domains.js:51-55`. A prior fix mistakenly replaced this
+ * with a `dnsRecords[]` array that doesn't exist on the wire; reverted
+ * (ADR-022).
+ */
 export interface AddDomainResult {
   domain: string;
   status: string;
@@ -682,23 +766,71 @@ export interface AgentLinkStats {
 
 // ─── Affiliate ───────────────────────────────────────────────────────────────
 
+/**
+ * `client.affiliate.getLimits()`'s return type — verified live against
+ * staging and `affiliate.js:184-197`. A prior fix mistakenly replaced this
+ * whole shape with just its `usage` sub-object; reverted (ADR-022).
+ */
+export interface AffiliateLimits {
+  tier: string;
+  limits: {
+    canCreatePrograms: boolean;
+    maxPrograms: number;
+    maxPartnersPerProgram: number;
+    canJoinAsPartner: boolean;
+    maxPartnerships: number;
+  };
+  usage: {
+    programs: number;
+    partnerships: number;
+  };
+}
+
 export interface AffiliateProgram {
   id: string;
   name: string;
   description?: string;
-  commissionType: 'cpc' | 'cpa_return' | 'both';
+  // `commissionType`/`status` were previously (incorrectly) marked optional
+  // based on a bad contract fixture — live staging shows both present on
+  // every list()/get() entry, so reverted to required.
+  commissionType: 'cpc' | 'cpa' | 'cpa_return' | 'both';
   cpcRate?: number;
   cpaRate?: number;
-  cookieDays?: number;
+  /** The real wire field name — verified live (was previously, incorrectly, `cookieDays`). */
+  cookieDurationDays?: number;
   status: string;
+  merchantId?: string;
+  maxPartners?: number;
+  partnerCount?: number;
+  isPublic?: boolean;
   createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * The public subset of a program returned by `discover()` — a listing of
+ * OTHER users' programs, not the owner-level detail `AffiliateProgram`
+ * carries. Live-verified (fixture 1.0.12, ADR-024): `commissionType` is
+ * present here, but `status` and every owner-only field (`merchantId`,
+ * `maxPartners`, `isPublic`, timestamps) are absent — discover() never
+ * returns them, so they don't belong on this type.
+ */
+export interface AffiliateProgramSummary {
+  id: string;
+  name: string;
+  description?: string;
+  commissionType: 'cpc' | 'cpa' | 'cpa_return' | 'both';
+  cpcRate?: number;
+  cpaRate?: number;
+  cookieDurationDays?: number;
+  partnerCount?: number;
 }
 
 export interface CreateAffiliateProgramOptions {
   name: string;
   description?: string;
   /** @deprecated the platform accepts a single `commissionRate` — kept optional for compat. */
-  commissionType?: 'cpc' | 'cpa_return' | 'both';
+  commissionType?: 'cpc' | 'cpa' | 'cpa_return' | 'both';
   cpcRate?: number;
   cpaRate?: number;
   commissionRate?: number;
@@ -707,7 +839,8 @@ export interface CreateAffiliateProgramOptions {
 
 export interface AffiliatePartner {
   id: string;
-  partnerId: string;
+  /** Not present on every response (list/updateStatus omit it) — verified against contract fixture 1.0.7. */
+  partnerId?: string;
   email?: string;
   status: string;
   partnerCode?: string;
@@ -717,8 +850,29 @@ export interface AffiliatePartner {
 export interface AffiliatePartnership {
   id: string;
   programId: string;
+  /** @deprecated not present on the real response — kept optional for compat. */
   programName?: string;
   partnerCode?: string;
   status: string;
+  /** @deprecated not present on the real response — see `createdAt`. */
   joinedAt?: string;
+  partnerId?: string;
+  partnerEmail?: string;
+  stats?: {
+    totalClicks: number;
+    uniqueClicks: number;
+    conversions: number;
+    pendingEarnings: number;
+    paidEarnings: number;
+  };
+  program?: {
+    id: string;
+    name: string;
+    commissionType?: string;
+    cpcRate?: number;
+    cpaRate?: number;
+    status?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
 }

@@ -4,6 +4,27 @@ import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { AwsysClient } from "../../src/index.js";
 import { AwsysForbiddenError } from "../../src/errors.js";
+import { parseTimestamp } from "../../src/timestamps.js";
+
+/**
+ * Deep-equals `actual` against `raw` except for the named fields, which are
+ * compared against `parseTimestamp(raw[field])` instead — for scenarios
+ * whose fixture body carries a raw Firestore timestamp shape that the SDK
+ * correctly normalizes (ADR-017/ADR-024: a blind `toEqual(response.body)`
+ * doesn't survive that normalization, and shouldn't — it should assert
+ * through what the SDK actually returns).
+ */
+function toEqualWithTimestamps(
+  actual: unknown,
+  raw: Record<string, unknown>,
+  timestampFields: string[],
+): void {
+  const expected = { ...raw };
+  for (const field of timestampFields) {
+    if (field in expected) expected[field] = parseTimestamp(expected[field]);
+  }
+  expect(actual).toEqual(expected);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Overridable so CI's contract-drift workflow can run this same suite
@@ -210,7 +231,44 @@ describe("Contract: capabilities — analytics", () => {
     const s = mockScenario("aggregate_stats");
     const result = await client.analytics.getAggregateStats("abc123", { period: "7d" });
     expectRequestMatches(s);
-    expect(result).toMatchObject(s.response.body as object);
+    // ADR-019's "byCountry/byDay" remapping was itself wrong (a bad
+    // fixture, not a real API shape) — reverted per ADR-022, live-verified
+    // against staging. The real field names ARE countryBreakdown/
+    // clicksByDay, matching the type directly; assert through the declared
+    // fields (not a blind toEqual) so a real future mismatch still fails
+    // loudly.
+    const body = s.response.body as {
+      shortCode: string;
+      fullPath: string | null;
+      period: string;
+      totalClicks: number;
+      botClicksExcluded: number;
+      uniqueVisitors: number;
+      clicksByDay: { date: string; clicks: number }[];
+      countryBreakdown: Record<string, number>;
+      deviceBreakdown: { mobile: number; desktop: number; tablet: number };
+      referrerBreakdown: Record<string, number>;
+      browserBreakdown: Record<string, number>;
+      osBreakdown: Record<string, number>;
+      hourBreakdown: { hour: number; clicks: number }[];
+      tierLimit: number;
+      tier: string;
+    };
+    expect(result.shortCode).toBe(body.shortCode);
+    expect(result.fullPath).toBe(body.fullPath);
+    expect(result.period).toBe(body.period);
+    expect(result.totalClicks).toBe(body.totalClicks);
+    expect(result.botClicksExcluded).toBe(body.botClicksExcluded);
+    expect(result.uniqueVisitors).toBe(body.uniqueVisitors);
+    expect(result.clicksByDay).toEqual(body.clicksByDay);
+    expect(result.countryBreakdown).toEqual(body.countryBreakdown);
+    expect(result.deviceBreakdown).toEqual(body.deviceBreakdown);
+    expect(result.referrerBreakdown).toEqual(body.referrerBreakdown);
+    expect(result.browserBreakdown).toEqual(body.browserBreakdown);
+    expect(result.osBreakdown).toEqual(body.osBreakdown);
+    expect(result.hourBreakdown).toEqual(body.hourBreakdown);
+    expect(result.tierLimit).toBe(body.tierLimit);
+    expect(result.tier).toBe(body.tier);
   });
 
   it("recent_clicks", async () => {
@@ -233,6 +291,11 @@ describe("Contract: capabilities — profile", () => {
     const s = mockScenario("profile_update");
     const result = await client.profile.update({ displayName: "New" });
     expectRequestMatches(s);
+    // Response is {success, displayName} — no uid/email echoed back, unlike
+    // profile_get. update() has its own UpdateProfileResult type, distinct
+    // from UserProfile, rather than falsely claiming uid/email (ADR-019).
+    expect(result.success).toBe(true);
+    expect(result.displayName).toBe("New");
     expect(result).toEqual(s.response.body);
   });
 });
@@ -354,7 +417,19 @@ describe("Contract: capabilities — bulk / me / usage", () => {
       urls: [{ url: "https://a.example/" }, { url: "https://b.example/", customSlug: "b" }],
     });
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // Assert through the declared type's field names, not a blind toEqual —
+    // `created`/`failed`/`total` live under `summary` on the wire, not
+    // top-level, so the type must actually mirror that nesting (ADR-019).
+    const body = s.response.body as {
+      success: boolean;
+      summary: { total: number; created: number; failed: number };
+      results: unknown[];
+    };
+    expect(result.success).toBe(body.success);
+    expect(result.summary.total).toBe(body.summary.total);
+    expect(result.summary.created).toBe(body.summary.created);
+    expect(result.summary.failed).toBe(body.summary.failed);
+    expect(result.results).toEqual(body.results);
   });
 
   it("me", async () => {
@@ -422,7 +497,19 @@ describe("Contract: capabilities — savedViews", () => {
     const s = mockScenario("views_list");
     const result = await client.savedViews.list();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // Fixture 1.0.11's real staging snapshot has Firestore-shaped
+    // createdAt/updatedAt — the SDK normalizes these to ISO strings, so a
+    // blind toEqual(response.body) would fail; assert per-field instead.
+    const body = s.response.body as {
+      views: { id: string; name: string; createdAt: unknown; updatedAt: unknown }[];
+    };
+    expect(result.views).toHaveLength(body.views.length);
+    result.views.forEach((view, i) => {
+      expect(view.id).toBe(body.views[i]?.id);
+      expect(view.name).toBe(body.views[i]?.name);
+      expect(typeof view.createdAt).toBe("string");
+      expect(typeof view.updatedAt).toBe("string");
+    });
   });
 
   it("view_create", async () => {
@@ -446,23 +533,61 @@ describe("Contract: capabilities — savedViews", () => {
 });
 
 describe("Contract: capabilities — utmTemplates", () => {
-  it("utm_list_via_me (no dedicated list route — ADR-003)", async () => {
-    const s = mockScenario("utm_list_via_me");
+  it("utm_list (GET /api/user/utm-templates, platform issue #833)", async () => {
+    const s = mockScenario("utm_list");
     const result = await client.utmTemplates.list();
     expectRequestMatches(s);
-    expect(result).toEqual((s.response.body as { utmTemplates: unknown[] }).utmTemplates);
+    const body = s.response.body as {
+      templates: { id: string; name: string; source: string; medium: string; campaign: string }[];
+    };
+    expect(result).toHaveLength(body.templates.length);
+    expect(result[0]?.id).toBe(body.templates[0]?.id);
+    expect(result[0]?.name).toBe(body.templates[0]?.name);
+    expect(result[0]?.source).toBe(body.templates[0]?.source);
+    expect(result[0]?.medium).toBe(body.templates[0]?.medium);
+    expect(result[0]?.campaign).toBe(body.templates[0]?.campaign);
+    // Deprecated legacy aliases still populated for compat (ADR-014).
+    expect(result[0]?.utmSource).toBe(body.templates[0]?.source);
   });
 
-  it("utm_create (normalizes to utmSource/utmMedium/utmCampaign)", async () => {
+  it("utm_create (source/medium/campaign — the platform's real field names, not utmSource/etc.)", async () => {
     const s = mockScenario("utm_create");
     const result = await client.utmTemplates.create({
+      name: "Launch",
+      source: "newsletter",
+      medium: "email",
+      campaign: "sept",
+    });
+    expectRequestMatches(s);
+    // Response nests under `template`, not flat top-level fields — assert
+    // through the resource's actual unwrapping/mapping, not a blind
+    // toEqual(response.body) (ADR-019).
+    const body = s.response.body as {
+      template: { id: string; name: string; source: string; medium: string; campaign: string };
+    };
+    expect(result.id).toBe(body.template.id);
+    expect(result.name).toBe(body.template.name);
+    expect(result.source).toBe(body.template.source);
+    expect(result.medium).toBe(body.template.medium);
+    expect(result.campaign).toBe(body.template.campaign);
+    // Deprecated legacy aliases still populated for compat (ADR-014).
+    expect(result.utmSource).toBe(body.template.source);
+    expect(result.utmMedium).toBe(body.template.medium);
+    expect(result.utmCampaign).toBe(body.template.campaign);
+  });
+
+  it("utm_create accepts the deprecated utmSource/utmMedium/utmCampaign aliases too", async () => {
+    const s = mockScenario("utm_create");
+    await client.utmTemplates.create({
       name: "Launch",
       utmSource: "newsletter",
       utmMedium: "email",
       utmCampaign: "sept",
     });
+    // The outgoing request must still use the real wire field names
+    // (source/medium/campaign) even when the caller used the deprecated
+    // alias names.
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
   });
 
   it("utm_delete", async () => {
@@ -526,7 +651,15 @@ describe("Contract: capabilities — customDomains", () => {
     const s = mockScenario("domains_list");
     const result = await client.customDomains.list();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    const body = s.response.body as {
+      domains: { domain: string; status: string; verificationToken: string }[];
+    };
+    // `status` is kept as a broad `string` (not a narrow union) since the
+    // full set of real values isn't confirmed — assert through it rather
+    // than hardcoding one observed value.
+    expect(result.domains[0]?.status).toBe(body.domains[0]?.status);
+    expect(result.domains[0]?.domain).toBe(body.domains[0]?.domain);
+    expect(result.domains[0]?.verificationToken).toBe(body.domains[0]?.verificationToken);
   });
 
   it("domain_add", async () => {
@@ -549,6 +682,10 @@ describe("Contract: capabilities — customDomains", () => {
       defaultRedirect: "https://example.com/",
     });
     expectRequestMatches(s);
+    // Response omits `status` entirely — CustomDomain.status is optional
+    // for exactly this reason (ADR-019).
+    expect(result.status).toBeUndefined();
+    expect(result.defaultRedirect).toBe("https://example.com/");
     expect(result).toEqual(s.response.body);
   });
 
@@ -572,13 +709,37 @@ describe("Contract: capabilities — namespace", () => {
     const s = mockScenario("namespace_get");
     const result = await client.namespace.get();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // ADR-022: adds namespaceData/canClaimSubdomain/canClaimCustomDomain
+    // (real fields, verified live), drops the phantom upgradeRequired.
+    // namespaceData.claimedAt is Firestore-shaped on the wire — normalized
+    // to an ISO string, so assert per-field rather than a blind toEqual.
+    const body = s.response.body as {
+      hasAccess: boolean;
+      namespace: string;
+      tier: string;
+      canClaimSubdomain: boolean;
+      canClaimCustomDomain: boolean;
+      namespaceData: { userEmail: string; isActive: boolean; tier: string; userId: string };
+    };
+    expect(result.hasAccess).toBe(body.hasAccess);
+    expect(result.namespace).toBe(body.namespace);
+    expect(result.tier).toBe(body.tier);
+    expect(result.canClaimSubdomain).toBe(body.canClaimSubdomain);
+    expect(result.canClaimCustomDomain).toBe(body.canClaimCustomDomain);
+    expect(result.namespaceData?.userEmail).toBe(body.namespaceData.userEmail);
+    expect(result.namespaceData?.isActive).toBe(body.namespaceData.isActive);
+    expect(typeof result.namespaceData?.claimedAt).toBe("string");
+    expect(result.upgradeRequired).toBeUndefined();
   });
 
   it("namespace_check", async () => {
     const s = mockScenario("namespace_check");
     const result = await client.namespace.check("acme");
     expectRequestMatches(s);
+    // reason/previewUrl are absent here — both optional on
+    // NamespaceCheckResult for exactly this reason (ADR-019).
+    expect(result.reason).toBeUndefined();
+    expect(result.previewUrl).toBeUndefined();
     expect(result).toEqual(s.response.body);
   });
 
@@ -602,28 +763,51 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_program_create");
     const result = await client.affiliate.createProgram({ name: "P", commissionRate: 10 });
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_programs_list (unwraps {programs:[]} envelope)", async () => {
     const s = mockScenario("affiliate_programs_list");
     const result = await client.affiliate.listPrograms();
     expectRequestMatches(s);
-    expect(result).toEqual((s.response.body as { programs: unknown[] }).programs);
+    // Fixture 1.0.11's real staging snapshot has Firestore-shaped
+    // createdAt/updatedAt — the SDK normalizes these to ISO strings, so a
+    // blind toEqual(response.body) would fail; assert per-field instead.
+    const body = s.response.body as {
+      programs: { id: string; name: string; status: string; commissionType: string }[];
+    };
+    expect(result).toHaveLength(body.programs.length);
+    result.forEach((program, i) => {
+      expect(program.id).toBe(body.programs[i]?.id);
+      expect(program.name).toBe(body.programs[i]?.name);
+      expect(program.status).toBe(body.programs[i]?.status);
+      expect(program.commissionType).toBe(body.programs[i]?.commissionType);
+      expect(typeof program.createdAt).toBe("string");
+      expect(typeof program.updatedAt).toBe("string");
+    });
   });
 
   it("affiliate_program_get", async () => {
     const s = mockScenario("affiliate_program_get");
     const result = await client.affiliate.getProgram("p1");
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_program_update", async () => {
     const s = mockScenario("affiliate_program_update");
     const result = await client.affiliate.updateProgram("p1", { name: "P2" });
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_program_stats", async () => {
@@ -637,6 +821,10 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_partners_list");
     const result = await client.affiliate.listPartners("p1");
     expectRequestMatches(s);
+    // partnerId is absent on list items — optional on AffiliatePartner for
+    // exactly this reason (ADR-019).
+    expect(result[0]?.partnerId).toBeUndefined();
+    expect(result[0]?.status).toBe("pending");
     expect(result).toEqual((s.response.body as { partners: unknown[] }).partners);
   });
 
@@ -644,13 +832,21 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_partner_status");
     const result = await client.affiliate.updatePartnerStatus("p1", "pt1", "approved");
     expectRequestMatches(s);
+    expect(result.partnerId).toBeUndefined();
+    expect(result.status).toBe("approved");
     expect(result).toEqual(s.response.body);
   });
 
-  it("affiliate_discover (unwraps {programs:[]} envelope)", async () => {
+  it("affiliate_discover (unwraps {programs:[]} envelope, returns AffiliateProgramSummary — ADR-024)", async () => {
     const s = mockScenario("affiliate_discover");
     const result = await client.affiliate.discover(20);
     expectRequestMatches(s);
+    // discover() is a public listing of OTHER users' programs — it returns
+    // AffiliateProgramSummary, a distinct, narrower type from the owned
+    // AffiliateProgram. commissionType IS present; status and every
+    // owner-only field are not part of this type at all (fixture 1.0.12).
+    expect(result[0]?.commissionType).toBe("cpa");
+    expect(result[0]).not.toHaveProperty("status");
     expect(result).toEqual((s.response.body as { programs: unknown[] }).programs);
   });
 
@@ -658,14 +854,30 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_join");
     const result = await client.affiliate.join("p9", "CODE");
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    toEqualWithTimestamps(result, s.response.body as Record<string, unknown>, [
+      "createdAt",
+      "updatedAt",
+    ]);
   });
 
   it("affiliate_partnerships_list (unwraps {partnerships:[]} envelope)", async () => {
     const s = mockScenario("affiliate_partnerships_list");
     const result = await client.affiliate.listPartnerships();
     expectRequestMatches(s);
-    expect(result).toEqual((s.response.body as { partnerships: unknown[] }).partnerships);
+    // Fixture 1.0.11's real staging snapshot has Firestore-shaped
+    // createdAt/updatedAt — the SDK normalizes these to ISO strings, so a
+    // blind toEqual(response.body) would fail; assert per-field instead.
+    const body = s.response.body as {
+      partnerships: { id: string; programId: string; status: string; partnerCode?: string }[];
+    };
+    expect(result).toHaveLength(body.partnerships.length);
+    result.forEach((partnership, i) => {
+      expect(partnership.id).toBe(body.partnerships[i]?.id);
+      expect(partnership.programId).toBe(body.partnerships[i]?.programId);
+      expect(partnership.status).toBe(body.partnerships[i]?.status);
+      expect(typeof partnership.createdAt).toBe("string");
+      expect(typeof partnership.updatedAt).toBe("string");
+    });
   });
 
   it("affiliate_partnership_stats", async () => {
@@ -686,7 +898,18 @@ describe("Contract: capabilities — affiliate", () => {
     const s = mockScenario("affiliate_limits");
     const result = await client.affiliate.getLimits();
     expectRequestMatches(s);
-    expect(result).toEqual(s.response.body);
+    // ADR-019's fix here was itself wrong (a bad fixture, not a real API
+    // shape) — reverted per ADR-022, live-verified against staging +
+    // affiliate.js:184-197. Real shape is {tier, limits, usage}.
+    const body = s.response.body as {
+      tier: string;
+      limits: Record<string, unknown>;
+      usage: { programs: number; partnerships: number };
+    };
+    expect(result.tier).toBe(body.tier);
+    expect(result.limits).toEqual(body.limits);
+    expect(result.usage.programs).toBe(body.usage.programs);
+    expect(result.usage.partnerships).toBe(body.usage.partnerships);
   });
 });
 
@@ -743,19 +966,28 @@ describe("Contract: capabilities — trustScore", () => {
     const s = mockScenario("trust_scan");
     const result = await client.trustScore.scan("abc123");
     expectRequestMatches(s);
-    // The SDK adds short/score/status as deprecated aliases mapped from
-    // the wire's shortCode/trustScore/trustStatus — not in the raw fixture.
+    // The real wire field is `short` (ADR-022 — a prior fix had this
+    // backwards, assuming `shortCode`). The SDK adds shortCode/score/status
+    // as deprecated aliases mapped from the real fields, and normalizes
+    // `createdAt` from its raw epoch-ms number to an ISO string.
     const body = s.response.body as {
-      shortCode: string;
+      short: string;
       trustScore: number | null;
       trustStatus: string;
+      threats: string[];
+      scannedAt: string;
+      source: string;
+      createdAt: number;
     };
-    expect(result).toEqual({
-      ...body,
-      short: body.shortCode,
-      score: body.trustScore,
-      status: body.trustStatus,
-    });
+    expect(result.short).toBe(body.short);
+    expect(result.trustScore).toBe(body.trustScore);
+    expect(result.trustStatus).toBe(body.trustStatus);
+    expect(result.threats).toEqual(body.threats);
+    expect(result.source).toBe(body.source);
+    expect(result.shortCode).toBe(body.short);
+    expect(result.score).toBe(body.trustScore);
+    expect(result.status).toBe(body.trustStatus);
+    expect(result.createdAt).toBe(new Date(body.createdAt).toISOString());
   });
 });
 

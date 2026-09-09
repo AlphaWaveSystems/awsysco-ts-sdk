@@ -1,6 +1,18 @@
 import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
+import { parseTimestamp } from "../timestamps.js";
 import type { NamespaceCheckResult, NamespaceInfo } from "../types.js";
+
+function mapNamespaceInfo(raw: NamespaceInfo): NamespaceInfo {
+  if (!raw.namespaceData?.claimedAt) return raw;
+  return {
+    ...raw,
+    namespaceData: {
+      ...raw.namespaceData,
+      claimedAt: parseTimestamp(raw.namespaceData.claimedAt) as string | null,
+    },
+  };
+}
 
 export class NamespaceResource {
   constructor(private readonly http: HttpClient) {}
@@ -9,7 +21,8 @@ export class NamespaceResource {
    * Get the authenticated user's current namespace info.
    */
   async get(options?: RequestOptions): Promise<NamespaceInfo> {
-    return this.http.get<NamespaceInfo>(paths.namespace.base, undefined, options);
+    const raw = await this.http.get<NamespaceInfo>(paths.namespace.base, undefined, options);
+    return mapNamespaceInfo(raw);
   }
 
   /**
@@ -34,7 +47,12 @@ export class NamespaceResource {
    * @param namespace - The namespace to claim
    */
   async claim(namespace: string, options?: RequestOptions): Promise<NamespaceInfo> {
-    return this.http.post<NamespaceInfo>(paths.namespace.base, { namespace }, options);
+    const raw = await this.http.post<NamespaceInfo>(
+      paths.namespace.base,
+      { namespace },
+      options,
+    );
+    return mapNamespaceInfo(raw);
   }
 
   /**

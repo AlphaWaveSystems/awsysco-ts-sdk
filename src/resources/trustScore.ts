@@ -4,22 +4,25 @@ import { parseTimestamp } from "../timestamps.js";
 import type { TrustScoreResult } from "../types.js";
 
 interface RawTrustScoreResult {
-  shortCode: string;
+  short: string;
   trustScore: number | null;
-  trustStatus: 'safe' | 'suspicious' | 'malicious' | 'unknown' | null;
+  trustStatus: string | null;
   threats: string[];
   scannedAt?: string | null;
+  source?: string;
+  createdAt?: number | string | null;
 }
 
 function mapTrustScoreResult(raw: RawTrustScoreResult): TrustScoreResult {
   return {
     ...raw,
-    // Legacy aliases (short/score/status) — kept for compat, mapped from
-    // the real wire fields rather than left permanently undefined.
-    short: raw.shortCode,
+    // Legacy aliases (shortCode/score/status) — kept for compat, mapped
+    // from the real wire fields rather than left permanently undefined.
+    shortCode: raw.short,
     score: raw.trustScore,
     status: raw.trustStatus,
     scannedAt: parseTimestamp(raw.scannedAt) as string | null | undefined,
+    createdAt: parseTimestamp(raw.createdAt) as string | null | undefined,
   };
 }
 

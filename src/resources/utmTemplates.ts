@@ -5,25 +5,25 @@ import type { CreateUtmTemplateOptions, UtmTemplate } from "../types.js";
 interface RawUtmTemplate {
   id: string;
   name: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
+  source?: string;
+  medium?: string;
+  campaign?: string;
   term?: string;
   content?: string;
 }
 
-interface MeResponse {
-  utmTemplates?: RawUtmTemplate[];
+interface ListUtmTemplatesResponse {
+  templates?: RawUtmTemplate[];
 }
 
 function mapUtmTemplate(raw: RawUtmTemplate): UtmTemplate {
   return {
     ...raw,
-    // Legacy aliases — kept for compat, mapped from the real wire fields
-    // rather than left permanently undefined.
-    source: raw.utmSource,
-    medium: raw.utmMedium,
-    campaign: raw.utmCampaign,
+    // Deprecated legacy aliases — kept for compat (ADR-014), mapped from
+    // the real wire fields (source/medium/campaign, not utmSource/etc.).
+    utmSource: raw.source,
+    utmMedium: raw.medium,
+    utmCampaign: raw.campaign,
   };
 }
 
@@ -32,20 +32,32 @@ export class UtmTemplatesResource {
 
   /**
    * List all UTM templates for the authenticated user.
-   * No dedicated list route exists (ADR-003) — fetches GET /api/v1/me and
-   * returns its `utmTemplates` array.
+   *
+   * @remarks Backed by `GET /api/user/utm-templates` (platform issue #833),
+   * replacing the earlier ADR-003 workaround of reading `/api/v1/me` (which
+   * never actually included template data via API key). As of fixture
+   * 1.0.10 this route is live on staging; production rollout is expected
+   * shortly after.
    */
   async list(options?: RequestOptions): Promise<UtmTemplate[]> {
-    const me = await this.http.get<MeResponse>(paths.utmTemplates.viaMe, undefined, options);
-    return (me.utmTemplates ?? []).map(mapUtmTemplate);
+    const res = await this.http.get<ListUtmTemplatesResponse>(
+      paths.utmTemplates.list,
+      undefined,
+      options,
+    );
+    return (res.templates ?? []).map(mapUtmTemplate);
   }
 
   /**
    * Create a new UTM template.
    *
-   * The platform reads `utmSource`/`utmMedium`/`utmCampaign` — the plain
-   * `source`/`medium`/`campaign` aliases are accepted here for compatibility
-   * but are normalized to the wire field names before sending.
+   * @remarks As of contract fixture 1.0.9 this currently 500s server-side
+   * (an unrelated `uuidv4 undefined` bug, tracked as platform issue #831)
+   * regardless of what the SDK sends — but the SDK sends the field names
+   * the platform's own code actually reads (`source`/`medium`/`campaign`,
+   * confirmed against `user.js:355`), not the previously-assumed
+   * `utmSource`/`utmMedium`/`utmCampaign`, so this is at least no longer
+   * guaranteed to fail on a field-name mismatch once #831 is fixed.
    *
    * @param opts - The UTM template fields
    */
@@ -54,16 +66,23 @@ export class UtmTemplatesResource {
     options?: RequestOptions,
   ): Promise<UtmTemplate> {
     const body: Record<string, string> = { name: opts.name };
-    const utmSource = opts.utmSource ?? opts.source;
-    const utmMedium = opts.utmMedium ?? opts.medium;
-    const utmCampaign = opts.utmCampaign ?? opts.campaign;
-    if (utmSource !== undefined) body.utmSource = utmSource;
-    if (utmMedium !== undefined) body.utmMedium = utmMedium;
-    if (utmCampaign !== undefined) body.utmCampaign = utmCampaign;
+    const source = opts.source ?? opts.utmSource;
+    const medium = opts.medium ?? opts.utmMedium;
+    const campaign = opts.campaign ?? opts.utmCampaign;
+    if (source !== undefined) body.source = source;
+    if (medium !== undefined) body.medium = medium;
+    if (campaign !== undefined) body.campaign = campaign;
     if (opts.term !== undefined) body.term = opts.term;
     if (opts.content !== undefined) body.content = opts.content;
-    const raw = await this.http.post<RawUtmTemplate>(paths.utmTemplates.create, body, options);
-    return mapUtmTemplate(raw);
+    const raw = await this.http.post<{ success?: boolean; template?: RawUtmTemplate }>(
+      paths.utmTemplates.create,
+      body,
+      options,
+    );
+    // The real response always nests under `template` — falling back to the
+    // raw body itself guards against an unexpected/malformed response
+    // shape rather than throwing on a missing key.
+    return mapUtmTemplate(raw.template ?? (raw as unknown as RawUtmTemplate));
   }
 
   /**

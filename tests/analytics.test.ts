@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { AwsysClient } from "../src/index.js";
 import { AnalyticsResource } from "../src/resources/analytics.js";
 import type { HttpClient } from "../src/http.js";
-import type { AggregateAnalytics } from "../src/types.js";
 
 function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
   return {
@@ -84,7 +83,12 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
   });
 
   it("GETs the aggregate path with the period query and parses a paid-tier response", async () => {
-    const expected: AggregateAnalytics = {
+    // Wire response uses countryBreakdown/clicksByDay directly — verified
+    // live against staging and contract fixture 1.0.11's aggregate_stats
+    // scenario. A prior fix (ADR-019) mistakenly remapped these from
+    // byCountry/byDay, which never actually existed on the wire; reverted
+    // (ADR-022). This is a blind passthrough, no mapping needed.
+    vi.mocked(http.get).mockResolvedValue({
       shortCode: "abc123",
       fullPath: "acme/abc123",
       period: "30d",
@@ -108,8 +112,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
         mediums: { email: 80 },
         campaigns: { launch: 80 },
       },
-    };
-    vi.mocked(http.get).mockResolvedValue(expected);
+    });
 
     const result = await analytics.getAggregateStats("abc123", { period: "30d" });
 
@@ -118,7 +121,11 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
       { period: "30d" },
       { signal: undefined, timeoutMs: undefined },
     );
-    expect(result).toEqual(expected);
+    expect(result.clicksByDay).toEqual([
+      { date: "2026-06-26", clicks: 20 },
+      { date: "2026-06-27", clicks: 30 },
+    ]);
+    expect(result.countryBreakdown).toEqual({ US: 300, DE: 120, CA: 120 });
     expect(result.deviceBreakdown).toEqual({ mobile: 200, desktop: 300, tablet: 40 });
     expect(result.utmBreakdown?.campaigns.launch).toBe(80);
   });
@@ -170,7 +177,7 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
   });
 
   it("parses a free-tier response with countryBreakdown + upgradeForMore", async () => {
-    const expected: AggregateAnalytics = {
+    vi.mocked(http.get).mockResolvedValue({
       shortCode: "free99",
       fullPath: null,
       period: "7d",
@@ -184,13 +191,32 @@ describe("AnalyticsResource.getAggregateStats (mocked)", () => {
         available: ["devices", "referrers", "browsers"],
         message: "Upgrade to Pro to unlock device, referrer, and browser breakdowns.",
       },
-    };
-    vi.mocked(http.get).mockResolvedValue(expected);
+    });
 
     const result = await analytics.getAggregateStats("free99", { period: "7d" });
 
     expect(result.upgradeForMore?.available).toContain("devices");
     expect(result.deviceBreakdown).toBeUndefined();
     expect(result.countryBreakdown).toEqual({ US: 8, MX: 4 });
+  });
+
+  it("passes through a minimal response shape unchanged (blind cast, no mapping)", async () => {
+    // Matches contract fixture 1.0.11's actual aggregate_stats scenario
+    // shape directly — countryBreakdown/clicksByDay are the real field
+    // names, no remapping needed (ADR-022).
+    vi.mocked(http.get).mockResolvedValue({
+      shortCode: "abc123",
+      fullPath: null,
+      totalClicks: 1,
+      countryBreakdown: { MX: 1 },
+      clicksByDay: [{ date: "2026-09-01", clicks: 1 }],
+    });
+
+    const result = await analytics.getAggregateStats("abc123");
+
+    expect(result.countryBreakdown).toEqual({ MX: 1 });
+    expect(result.clicksByDay).toEqual([{ date: "2026-09-01", clicks: 1 }]);
+    expect(result.period).toBeUndefined();
+    expect(result.tier).toBeUndefined();
   });
 });

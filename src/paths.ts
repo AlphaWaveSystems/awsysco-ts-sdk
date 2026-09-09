@@ -73,8 +73,8 @@ export const paths = {
       `/api/link/${encodeSegment(shortPath)}/tags/${encodeSegment(tag)}`,
   },
   utmTemplates: {
-    /** No dedicated list route exists — list is derived from `/api/v1/me` (ADR-003). */
-    viaMe: "/api/v1/me",
+    /** `GET /api/user/utm-templates`, added by platform issue #833. */
+    list: "/api/user/utm-templates",
     create: "/api/user/utm-templates",
     byId: (id: string): string => `/api/user/utm-templates/${encodeSegment(id)}`,
   },

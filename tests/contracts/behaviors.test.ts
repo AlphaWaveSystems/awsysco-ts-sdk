@@ -13,6 +13,34 @@ const pkg = JSON.parse(
   readFileSync(resolve(__dirname, "../../package.json"), "utf-8"),
 ) as { version: string };
 
+// Overridable so CI's contract-drift workflow can run this same suite
+// against a freshly-fetched platform contract without touching the
+// vendored copy in the working tree (same convention as capabilities.test.ts
+// and errors.test.ts).
+const contractPath =
+  process.env.AWSYS_CONTRACT_FIXTURE_PATH ?? resolve(__dirname, "sdk-contract.json");
+const contract = JSON.parse(readFileSync(contractPath, "utf-8")) as {
+  behaviors: Array<{ id: string }>;
+};
+
+/**
+ * Marks a behavior scenario ID as covered by this file. A no-op at runtime
+ * (returns void) — its only purpose is to appear, as a string literal, in
+ * this file's own source, so the static text scan below can find it. Same
+ * convention as `coveredIds`/`coveredErrorIds` in capabilities.test.ts and
+ * errors.test.ts: static text analysis is collection-time, not
+ * execution-time, so it stays correct under `--shard`/`.only`.
+ */
+function markCovered(_id: string): void {
+  // Intentionally empty.
+}
+
+const coveredBehaviorIds = new Set(
+  [...readFileSync(fileURLToPath(import.meta.url), "utf-8").matchAll(
+    /markCovered\(\s*"([^"]+)"/g,
+  )].map((m) => m[1]),
+);
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -53,6 +81,7 @@ afterEach(() => {
 //     (extends timestamp_variants with the 4 specific malformed inputs)
 
 describe("Contract: behaviors — auth_header", () => {
+  markCovered("auth_header");
   it("sends Authorization: Bearer <key> on every authenticated request", async () => {
     const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: "abc123" }));
@@ -66,6 +95,7 @@ describe("Contract: behaviors — auth_header", () => {
 });
 
 describe("Contract: behaviors — unknown_fields_preserved", () => {
+  markCovered("unknown_fields_preserved");
   it("does not raise on extra JSON fields, and they remain accessible", async () => {
     const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
     fetchMock.mockResolvedValueOnce(
@@ -91,6 +121,8 @@ describe("Contract: behaviors — unknown_fields_preserved", () => {
 });
 
 describe("Contract: behaviors — redaction", () => {
+  markCovered("redaction");
+  markCovered("redaction_str"); // String()/template-literal coercion + HttpClient's own redaction, tested below.
   const RAW_KEY = "awsys_super_secret_key_do_not_leak";
 
   it("JSON.stringify(client) never contains the raw API key", () => {
@@ -177,6 +209,7 @@ describe("Contract: behaviors — redaction", () => {
 });
 
 describe("Contract: behaviors — user_agent", () => {
+  markCovered("user_agent");
   it("matches ^awsysco-ts-sdk/x.y.z (node/…) and the version equals package.json", async () => {
     const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: "abc123" }));
@@ -191,6 +224,7 @@ describe("Contract: behaviors — user_agent", () => {
 });
 
 describe("Contract: behaviors — base_url_override", () => {
+  markCovered("base_url_override");
   it("a valid override with a trailing slash routes requests correctly, slash stripped", async () => {
     const client = new AwsysClient({
       apiKey: "awsys_test_key",
@@ -218,6 +252,7 @@ describe("Contract: behaviors — base_url_override", () => {
 });
 
 describe("Contract: behaviors — missing_api_key", () => {
+  markCovered("missing_api_key");
   const originalEnv = process.env.AWSYS_API_KEY;
 
   afterEach(() => {
@@ -245,6 +280,7 @@ describe("Contract: behaviors — missing_api_key", () => {
 });
 
 describe("Contract: behaviors — iterator_links", () => {
+  markCovered("iterator_links");
   it("list_all over scenarios list_links → list_links_last_page yields 3 links with 2 requests", async () => {
     const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
     fetchMock
@@ -275,6 +311,7 @@ describe("Contract: behaviors — iterator_links", () => {
 });
 
 describe("Contract: behaviors — iterator_links_limit_zero", () => {
+  markCovered("iterator_links_limit_zero");
   it("limit: 0 clamps to 1 and terminates instead of looping forever", async () => {
     const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
     fetchMock.mockResolvedValueOnce(
@@ -315,6 +352,7 @@ describe("Contract: behaviors — iterator_links_limit_zero", () => {
 });
 
 describe("Contract: behaviors — links_list_has_more_from_pagination", () => {
+  markCovered("links_list_has_more_from_pagination");
   it("list()'s hasMore is read from pagination.hasMore, not a top-level key", async () => {
     const client = new AwsysClient({ apiKey: "awsys_test_key", baseUrl: "https://awsys.co" });
 
@@ -344,6 +382,8 @@ describe("Contract: behaviors — links_list_has_more_from_pagination", () => {
 });
 
 describe("Contract: behaviors — timestamp_variants", () => {
+  markCovered("timestamp_variants");
+  markCovered("timestamp_never_raises");
   it("passes through a plain ISO string unchanged", () => {
     expect(parseTimestamp("2026-09-01T00:00:00.000Z")).toBe("2026-09-01T00:00:00.000Z");
   });
@@ -363,7 +403,11 @@ describe("Contract: behaviors — timestamp_variants", () => {
     expect(parseTimestamp(garbage)).toBe(garbage);
     expect(parseTimestamp(null)).toBe(null);
     expect(parseTimestamp(undefined)).toBe(undefined);
-    expect(parseTimestamp(42)).toBe(42);
+  });
+
+  it("parses a plain epoch-milliseconds number to an ISO string (e.g. trust-scan's createdAt)", () => {
+    expect(parseTimestamp(42)).toBe(new Date(42).toISOString());
+    expect(parseTimestamp(1788950303155)).toBe(new Date(1788950303155).toISOString());
   });
 
   it("timestamp_never_raises: never throws for malformed/out-of-range shapes", () => {
@@ -448,6 +492,7 @@ describe("Contract: behaviors — timestamp_variants (wired into response parsin
 });
 
 describe("Contract: behaviors — body_read_within_timeout", () => {
+  markCovered("body_read_within_timeout");
   it("a body read that stalls past the timeout raises AwsysTimeoutError (timer covers the whole attempt, not just headers)", async () => {
     vi.useFakeTimers();
     const client = new AwsysClient({
@@ -484,6 +529,7 @@ describe("Contract: behaviors — body_read_within_timeout", () => {
 });
 
 describe("Contract: behaviors — config_warnings", () => {
+  markCovered("config_warnings");
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -510,6 +556,7 @@ describe("Contract: behaviors — config_warnings", () => {
 });
 
 describe("Contract: behaviors — release_tag_matches_version", () => {
+  markCovered("release_tag_matches_version");
   it("publish.yml asserts the git tag equals v<package.json version> before publishing", () => {
     const workflow = readFileSync(
       resolve(__dirname, "../../.github/workflows/publish.yml"),
@@ -522,5 +569,20 @@ describe("Contract: behaviors — release_tag_matches_version", () => {
     const publishIndex = workflow.indexOf("npm publish");
     expect(versionCheckIndex).toBeGreaterThan(-1);
     expect(versionCheckIndex).toBeLessThan(publishIndex);
+  });
+});
+
+describe("Contract: behavior coverage", () => {
+  it("every behavior scenario is exercised by a test in this file (Gate 3)", () => {
+    const missing = contract.behaviors
+      .map((b) => b.id)
+      .filter((id) => !coveredBehaviorIds.has(id));
+
+    if (missing.length > 0) {
+      throw new Error(
+        `${missing.length}/${contract.behaviors.length} behavior scenario(s) not yet mapped to a test:\n` +
+          missing.map((id) => `  - ${id}`).join("\n"),
+      );
+    }
   });
 });

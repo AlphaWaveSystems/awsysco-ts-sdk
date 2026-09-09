@@ -11,7 +11,8 @@ export class BulkResource {
    * Requires Builder tier or higher.
    *
    * @param opts - Bulk creation options including array of URLs
-   * @returns Results for each URL in the request
+   * @returns `{ success, summary: { total, created, failed }, results }` —
+   *   the counts live under `summary`, not top-level, matching the wire shape.
    */
   async create(opts: BulkCreateOptions, options?: RequestOptions): Promise<BulkCreateResult> {
     return this.http.post<BulkCreateResult>(paths.bulk.base, opts, options);

@@ -2,14 +2,20 @@ import type { HttpClient, RequestOptions } from "../http.js";
 import { paths } from "../paths.js";
 import { mapTimestampFields } from "../timestamps.js";
 import type {
+  AffiliateLimits,
   AffiliatePartner,
   AffiliatePartnership,
   AffiliateProgram,
+  AffiliateProgramSummary,
   CreateAffiliateProgramOptions,
 } from "../types.js";
 
 function mapAffiliateProgram(raw: AffiliateProgram): AffiliateProgram {
-  return mapTimestampFields(raw, ["createdAt"]);
+  return mapTimestampFields(raw, ["createdAt", "updatedAt"]);
+}
+
+function mapAffiliatePartnership(raw: AffiliatePartnership): AffiliatePartnership {
+  return mapTimestampFields(raw, ["createdAt", "updatedAt"]);
 }
 
 export class AffiliateResource {
@@ -126,13 +132,22 @@ export class AffiliateResource {
    *
    * @param limit - Maximum number of programs to return
    */
+  /**
+   * Discover public affiliate programs run by other users.
+   *
+   * @remarks Returns `AffiliateProgramSummary`, not the full `AffiliateProgram`
+   * — discover() is a public listing of other users' programs, so it never
+   * includes `status` or owner-only fields (`merchantId`, `maxPartners`,
+   * `isPublic`, timestamps). Use `getProgram()`/`listPrograms()` for a
+   * program you own to get the full shape.
+   */
   async discover(
     limit?: number,
     options?: RequestOptions,
-  ): Promise<AffiliateProgram[]> {
+  ): Promise<AffiliateProgramSummary[]> {
     const params: Record<string, string | number> = {};
     if (limit !== undefined) params.limit = limit;
-    const raw = await this.http.get<{ programs: AffiliateProgram[] }>(
+    const raw = await this.http.get<{ programs: AffiliateProgramSummary[] }>(
       paths.affiliate.discover,
       params,
       options,
@@ -153,7 +168,12 @@ export class AffiliateResource {
   ): Promise<AffiliatePartnership> {
     const body: Record<string, string> = {};
     if (partnerCode !== undefined) body.partnerCode = partnerCode;
-    return this.http.post<AffiliatePartnership>(paths.affiliate.join(programId), body, options);
+    const raw = await this.http.post<AffiliatePartnership>(
+      paths.affiliate.join(programId),
+      body,
+      options,
+    );
+    return mapAffiliatePartnership(raw);
   }
 
   /**
@@ -165,7 +185,7 @@ export class AffiliateResource {
       undefined,
       options,
     );
-    return raw.partnerships;
+    return (raw.partnerships ?? []).map(mapAffiliatePartnership);
   }
 
   /**
@@ -206,13 +226,7 @@ export class AffiliateResource {
   /**
    * Get affiliate tier limits and current usage.
    */
-  async getLimits(
-    options?: RequestOptions,
-  ): Promise<{ tier: string; limits: Record<string, unknown>; usage: Record<string, unknown> }> {
-    return this.http.get<{ tier: string; limits: Record<string, unknown>; usage: Record<string, unknown> }>(
-      paths.affiliate.limits,
-      undefined,
-      options,
-    );
+  async getLimits(options?: RequestOptions): Promise<AffiliateLimits> {
+    return this.http.get<AffiliateLimits>(paths.affiliate.limits, undefined, options);
   }
 }

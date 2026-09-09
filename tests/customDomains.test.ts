@@ -47,12 +47,13 @@ describe("CustomDomainsResource", () => {
 
   describe("add", () => {
     it("calls POST /api/user/domains with { domain }", async () => {
+      // Real shape (contract fixture 1.0.9): dnsRecords array, not
+      // verificationToken/txtRecord/cnameRecord (ADR-019 — the previous
+      // type claimed fields that never existed on the wire).
       const expected = {
         domain: "links.example.com",
-        status: "pending_txt",
-        verificationToken: "verify-abc",
-        txtRecord: { name: "_awsys-verify", type: "TXT", value: "verify-abc" },
-        cnameRecord: { name: "links", type: "CNAME", value: "cname.awsys.co" },
+        status: "pending",
+        dnsRecords: [{ type: "TXT", name: "_awsys", value: "x" }],
       };
       vi.mocked(http.post).mockResolvedValue(expected);
 
@@ -63,7 +64,7 @@ describe("CustomDomainsResource", () => {
         { domain: "links.example.com" },
         undefined,
       );
-      expect(result.verificationToken).toBe("verify-abc");
+      expect(result.dnsRecords).toEqual(expected.dnsRecords);
     });
   });
 
