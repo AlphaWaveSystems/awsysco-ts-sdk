@@ -101,8 +101,9 @@ async function main() {
   try {
     const program = await client.affiliate.createProgram({
       name: "My Affiliate Program",
-      commissionRate: 10,
-      cookieDays: 30,
+      commissionType: "cpc",
+      cpcRate: 0.5,
+      cookieDurationDays: 30,
     });
     console.log("Program created:", program.id);
 
