@@ -33,11 +33,26 @@ jobs:
         run: npm ci
 
       - name: Fetch latest platform contract
+        # The platform repo is private, so the contract cannot be downloaded
+        # from raw.githubusercontent.com (that always returned 404 and the job
+        # failed before it could report drift). The platform's dispatch now
+        # carries it: gzip + base64 in client_payload.contractGzB64, with its
+        # SHA-256. It is read only through env: and parsed as JSON, never
+        # interpolated into the script. A scheduled run has no payload and
+        # checks the vendored copy only.
+        env:
+          CONTRACT_GZ_B64: ${{ github.event.client_payload.contractGzB64 }}
+          CONTRACT_SHA256: ${{ github.event.client_payload.contractSha256 }}
         run: |
           set -euo pipefail
-          curl -fsSL \
-            "https://raw.githubusercontent.com/AlphaWaveSystems/awsys-shortener/master/contracts/sdk-contract.json" \
-            -o /tmp/latest-sdk-contract.json
+          if [ -z "${CONTRACT_GZ_B64:-}" ]; then
+            echo "::notice::No contract in the dispatch payload (scheduled run or an older sender); checking the vendored contract only."
+            cp tests/contracts/sdk-contract.json /tmp/latest-sdk-contract.json
+          else
+            printf '%s' "$CONTRACT_GZ_B64" | base64 -d | gunzip > /tmp/latest-sdk-contract.json
+            echo "${CONTRACT_SHA256}  /tmp/latest-sdk-contract.json" | sha256sum -c -
+          fi
+          jq -e '.version | type == "string"' /tmp/latest-sdk-contract.json > /dev/null
 
       - name: Compare version and run contract-fixture suite against the fetched file
         id: check
