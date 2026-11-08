@@ -119,6 +119,14 @@ describe("Contract: error mapping (no retry involved)", () => {
     expect(err.code).toBe("EMAIL_NOT_VERIFIED");
   });
 
+  it("err_403_suspended → AwsysForbiddenError (fraud-suspended account)", async () => {
+    const s = scenario("err_403_suspended");
+    fetchMock.mockResolvedValueOnce(jsonOrTextResponse(s.status!, s.body));
+    const err = await client.links.create({ url: "https://example.com" }).catch((e) => e);
+    expect(err).toBeInstanceOf(AwsysForbiddenError);
+    expect(err.code).toBe("ACCOUNT_SUSPENDED");
+  });
+
   it("err_403_feature_disabled → AwsysForbiddenError (recentClicks flag off)", async () => {
     const s = scenario("err_403_feature_disabled");
     fetchMock.mockResolvedValueOnce(jsonOrTextResponse(s.status!, s.body));
