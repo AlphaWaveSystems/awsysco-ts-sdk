@@ -51,13 +51,13 @@ export class AnalyticsResource {
    * breakdowns depending on the plan.
    *
    * @param shortPath - The short code or namespaced path (e.g. "abc123" or "ns/slug")
-   * @param opts - Optional window (`period`: "7d" default, "30d", or "90d")
+   * @param opts - Optional window (`period`: "7d" default, "30d", "90d", or "365d")
    *   plus a per-call `signal`/`timeoutMs` override
    * @returns Aggregated stats including clicks-by-day and dimension breakdowns
    */
   async getAggregateStats(
     shortPath: string,
-    opts?: { period?: "7d" | "30d" | "90d" } & RequestOptions,
+    opts?: { period?: "7d" | "30d" | "90d" | "365d" } & RequestOptions,
   ): Promise<AggregateAnalytics> {
     const params: Record<string, string | number> = {};
     if (opts?.period !== undefined) params.period = opts.period;
